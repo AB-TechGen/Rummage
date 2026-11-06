@@ -11,8 +11,8 @@ final class SettingsScreen extends Screen {
     private final RummageClient mod;private final Screen parent;private int page;
     private final Map<String,String> values=new LinkedHashMap<>();private final Map<String,EditBox> fields=new HashMap<>();
     private String error="";
-    private static final String[][] KEYS={{"biome","sudden","lookout","drops","race","allowBright"},{"fair","biomeFilter","structureFilter","radius"},{"hud","hudScale","fullbright","keepWorlds"},{"relay","updateUrl","updateKey"}};
-    private static final String[][] LABELS={{"Biome-aware targets","Sudden death","Lookout seconds","Standard loot RNG","Race preset","Allow fullbright"},{"Fair-play controls","Required biome ID","Required structure ID","Search radius"},{"Show HUD","HUD scale (%)","Fullbright enabled","Keep worlds (0 = all)"},{"Relay address","Update manifest URL","Trusted public key"}};
+    private static final String[][] KEYS={{"biome","sudden","lookout","drops","race","allowBright"},{"fair","biomeFilter","structureFilter","radius"},{"hud","hudScale","fullbright","keepWorlds"},{"updateUrl","updateKey"}};
+    private static final String[][] LABELS={{"Biome-aware targets","Sudden death","Lookout seconds","Standard loot RNG","Race preset","Allow fullbright"},{"Fair-play controls","Required biome ID","Required structure ID","Search radius"},{"Show HUD","HUD scale (%)","Fullbright enabled","Keep worlds (0 = all)"},{"Update manifest URL","Trusted public key"}};
     private static final Set<String> TOGGLES=Set.of("biome","sudden","drops","race","allowBright","fair","hud","fullbright");
     SettingsScreen(RummageClient mod,Screen parent){super(Component.literal("Rummage settings"));this.mod=mod;this.parent=parent;
         var s=mod.connection==null?null:mod.connection.state;MatchRules r=s==null?mod.savedRules():s.rules();
@@ -42,8 +42,8 @@ final class SettingsScreen extends Screen {
     }catch(IllegalArgumentException e){error="Invalid setting: "+e.getMessage();}}
     @Override public boolean isPauseScreen(){return false;}
     @Override public void onClose(){minecraft.gui.setScreen(parent);}
-    @Override public void extractRenderState(GuiGraphicsExtractor g,int x,int y,float delta){g.fill(0,0,width,height,0xF00D171B);g.centeredText(font,new String[]{"MATCH RULES","WORLD FILTERS","PREFERENCES","NETWORK / UPDATES"}[page],width/2,16,0xFF67E8A5);
-        String hint=page==0?"Race: portal supplies, food, reduced Nether fog.":page==1?"Blank filters accept any seed; random searches try up to 8 worlds.":page==2?"Cleanup is opt-in; favourites are always protected.":"Relay changes apply to the next connection.";
+    @Override public void extractRenderState(GuiGraphicsExtractor g,int x,int y,float delta){g.fill(0,0,width,height,0xF00D171B);g.centeredText(font,new String[]{"MATCH RULES","WORLD FILTERS","PREFERENCES","UPDATES"}[page],width/2,16,0xFF67E8A5);
+        String hint=page==0?"Race: portal supplies, food, reduced Nether fog.":page==1?"Blank filters accept any seed; random searches try up to 8 worlds.":page==2?"Cleanup is opt-in; favourites are always protected.":"Connections are set up automatically when you host.";
         g.centeredText(font,font.plainSubstrByWidth(hint,width-20),width/2,32,0xFFBDCEC8);
         int left=Math.max(10,width/2-250),w=Math.min(500,width-20),step=Math.min(32,Math.max(22,(height-125)/6));for(int i=0;i<LABELS[page].length;i++)g.text(font,font.plainSubstrByWidth(LABELS[page][i],w/2-6),left,60+i*step,0xFFFFFFFF);
         if(!error.isEmpty())g.text(font,font.plainSubstrByWidth(error,width-20),10,height-66,0xFFFF7755);super.extractRenderState(g,x,y,delta);

@@ -32,6 +32,7 @@ class CachedBuild {
         try(JarOutputStream jar=new JarOutputStream(Files.newOutputStream(output),manifest)){
             addTree(jar,classes);addTree(jar,Path.of("src/main/resources"));
             jar.putNextEntry(new JarEntry("LICENSE"));Files.copy(Path.of("LICENSE"),jar);jar.closeEntry();
+            jar.putNextEntry(new JarEntry("META-INF/licenses/OpenDraft-MIT.txt"));Files.copy(Path.of("licenses/OpenDraft-MIT.txt"),jar);jar.closeEntry();
         }
         System.out.println("Compiled "+sources.size()+" source files. Created "+output+" (no dependencies bundled).");
     }

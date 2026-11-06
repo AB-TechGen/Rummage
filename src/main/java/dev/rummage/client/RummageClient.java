@@ -45,7 +45,7 @@ public final class RummageClient implements ClientModInitializer {
     public final WorldStore worlds=new WorldStore(FabricLoader.getInstance().getGameDir().resolve("saves"));
     public volatile String updateStatus="",relayStatus="";
     public volatile Updates.Release update;
-    private Relay.Host relayHost;
+    private AutoHosting hosting;
     private volatile boolean worldMarked;
     private long lastDimension;
     private boolean recoveringWorld;
@@ -54,6 +54,7 @@ public final class RummageClient implements ClientModInitializer {
     public void savePreferences(){try{preferences.save();}catch(RuntimeException e){error="Could not save preferences: "+e.getMessage();}}
     @Override public void onInitializeClient() {
         INSTANCE = this;
+        String customRelay=preferences.get("relay","").strip();CloudRelay.url=customRelay.equalsIgnoreCase("off")?"":customRelay.isBlank()||customRelay.startsWith("tls://")||customRelay.startsWith("tcp://")?CloudRelay.DEFAULT_URL:customRelay;
         name=preferences.get("name","Player");worldMatch=preferences.get("worldMatch","");worldFolder=preferences.get("worldFolder","");
         var category=KeyMapping.Category.register(Identifier.fromNamespaceAndPath("rummage","extras"));
         brightKey=KeyMappingHelper.registerKeyMapping(new KeyMapping("key.rummage.fullbright",InputConstants.KEY_G,category));
@@ -129,7 +130,7 @@ public final class RummageClient implements ClientModInitializer {
         while(brightKey.consumeClick()){preferences.put("fullbright",!preferences.flag("fullbright",false));savePreferences();}
         while(hudKey.consumeClick()){preferences.put("hud",!preferences.flag("hud",true));savePreferences();}
         while(playersKey.consumeClick())mc.gui.setScreen(mc.gui.screen() instanceof PlayersScreen?null:new PlayersScreen(this,mc.gui.screen()));
-        if(relayHost!=null){relayStatus=relayHost.status;if(!relayHost.code.isEmpty())invite="RM-"+relayHost.code;}
+        if(hosting!=null){var reach=hosting.reach();relayStatus=reach.note();invite=reach.code();}
         while (lobbyKey.consumeClick()) mc.gui.setScreen(mc.gui.screen() instanceof LobbyScreen ? null : new LobbyScreen(this));
         LobbyConnection c=connection; Snapshot s=c==null?null:c.state;
         if (s==null) return;
@@ -154,8 +155,8 @@ public final class RummageClient implements ClientModInitializer {
     public Snapshot activeState(net.minecraft.server.MinecraftServer server){var c=connection;var s=c==null?null:c.state;return s!=null&&!s.phase().equals("LOBBY")&&s.matchId().equals(worldMatch)&&server.getWorldData().getLevelName().equals(worldFolder)?s:null;}
     public boolean applies(net.minecraft.server.MinecraftServer server){return activeState(server)!=null;}
     public boolean fullbright(){return inMatchWorld()&&connection.state.rules().fullbright()&&preferences.flag("fullbright",false);}
-    public void host(String playerName, String advertisedAddress) {
-        try { leave(); host=new Synchronizer(25570); invite=host.invite(advertisedAddress.isBlank()?InetAddress.getLocalHost().getHostAddress():advertisedAddress.strip()); name=playerName;rememberName();connect(host.invite("127.0.0.1"),false);String relay=preferences.get("relay","");if(!relay.isBlank())relayHost=new Relay.Host(relay,host.port(),host.secret);error="";
+    public void host(String playerName) {
+        try { leave(); host=Synchronizer.openAnyPort(); invite="";relayStatus="Connecting so friends can join…"; name=playerName;rememberName();connect(host.invite("127.0.0.1"),false);hosting=new AutoHosting(host.port(),this::message);error="";
             LobbyConnection joined=connection;Thread.ofVirtual().start(()->{for(int i=0;i<100&&connection==joined;i++){if(joined.state!=null){joined.send("CONFIG",preferences.flag("randomSeed",true)?""+joined.state.seed():preferences.get("seed",""+joined.state.seed()),preferences.get("seconds","300"),preferences.get("rounds","20"));joined.send("RULES",savedRules().encode(),""+preferences.flag("randomSeed",true));return;}try{Thread.sleep(100);}catch(InterruptedException e){return;}}});
         }
         catch (Exception e) { error="Could not host: "+e.getMessage(); }
@@ -164,7 +165,7 @@ public final class RummageClient implements ClientModInitializer {
     private void rememberName(){preferences.put("name",name);savePreferences();}
     private void connect(String code,boolean recovery){pendingRules=null;String token=recovery?preferences.get("token",""):"";preferences.put("recoveryInvite",code);savePreferences();connection=new LobbyConnection(code,name,this::message,token,t->{preferences.put("token",t);savePreferences();},preferences.get("relay",""));}
     public void recover(){try{if(connection!=null&&connection.connected){error="Already connected.";return;}if(connection!=null)connection.close();invite=preferences.get("recoveryInvite","");connect(invite,true);recoveringWorld=true;error="";}catch(RuntimeException e){error="Recovery failed: "+e.getMessage();}}
-    public void leave() { if(connection!=null) connection.close(); connection=null; if(relayHost!=null)relayHost.close();relayHost=null;if(host!=null)try {host.close();}catch(Exception ignored){} host=null; invite=""; messages.clear();preferences.put("token","");preferences.put("recoveryInvite","");savePreferences(); }
+    public void leave() { if(connection!=null) connection.close(); connection=null; if(hosting!=null)hosting.close();hosting=null;relayStatus="";if(host!=null)try {host.close();}catch(Exception ignored){} host=null; invite=""; messages.clear();preferences.put("token","");preferences.put("recoveryInvite","");savePreferences(); }
     public void checkUpdates(){Thread.ofVirtual().start(()->{String url=preferences.get("updateUrl",""),key=preferences.get("updateKey","");if(url.isBlank()||key.isBlank()){updateStatus="Set an update manifest URL and trusted key in Preferences.";return;}try{updateStatus="Checking updates…";update=Updates.check(url,key);updateStatus=update==null?"You are up to date.":"Verified update available: "+update.version();}catch(Exception e){updateStatus="Update check failed: "+e.getMessage();}});}
     public void downloadUpdate(){var release=update;if(release==null)return;Thread.ofVirtual().start(()->{try{Path jar=Updates.download(release,FabricLoader.getInstance().getConfigDir().resolve("rummage-update"));updateStatus="Verified download: "+jar.getFileName()+". Open update folder to install.";}catch(Exception e){updateStatus="Download failed: "+e.getMessage();}});}
     public void message(String text) { messages.addLast(text); while(messages.size()>50)messages.pollFirst(); }

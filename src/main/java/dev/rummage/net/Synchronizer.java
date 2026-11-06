@@ -16,15 +16,27 @@ public final class Synchronizer implements AutoCloseable {
     private final Set<Socket> sockets = ConcurrentHashMap.newKeySet();
     private final ScheduledExecutorService clock = Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, "rummage-clock"); t.setDaemon(true); return t; });
     private final Semaphore capacity = new Semaphore(16);
+    private String lastState="";
+    private long lastBroadcast;
     public final String secret = UUID.randomUUID().toString();
     public Synchronizer(int port) throws IOException {
         server = new ServerSocket(port);
         match.seed = new SecureRandom().nextLong();
         Thread.ofVirtual().name("rummage-accept").start(this::accept);
         match.graceMillis=300;
-        clock.scheduleAtFixedRate(() -> { synchronized (match) { long now=Snapshot.now(); match.tick(now); for(Peer p:peers.values())if(now-p.pingSent>=2000){p.pingSent=now;p.nonce=UUID.randomUUID().toString();p.send("PROBE",p.nonce);} tokens.values().removeIf(id -> !match.players.containsKey(id)); broadcast(Snapshot.encode(match, now)); } }, 0, 100, TimeUnit.MILLISECONDS);
+        clock.scheduleAtFixedRate(() -> { synchronized (match) { long now=Snapshot.now(); match.tick(now); for(Peer p:peers.values())if(now-p.pingSent>=2000){p.pingSent=now;p.nonce=UUID.randomUUID().toString();p.send("PROBE",p.nonce);} tokens.values().removeIf(id -> !match.players.containsKey(id));
+            // Clients interpolate the clock. Send changes immediately, otherwise only one refresh per second.
+            String[] state=Snapshot.encode(match,now),stable=state.clone();stable[9]="";stable[13]="";
+            String signature=Wire.pack(stable);
+            if(!signature.equals(lastState)||now-lastBroadcast>=1000){broadcast(state);lastState=signature;lastBroadcast=now;}
+        } }, 0, 100, TimeUnit.MILLISECONDS);
     }
     public int port() { return server.getLocalPort(); }
+    /** Hosting chooses another free port if the usual one is occupied. */
+    public static Synchronizer openAnyPort() throws IOException {
+        return openAnyPort(25570);
+    }
+    static Synchronizer openAnyPort(int preferred)throws IOException{try{return new Synchronizer(preferred);}catch(BindException e){return new Synchronizer(0);}}
     public String invite(String host) { return "BS1-" + Wire.pack(host, ""+port(), secret); }
     private void accept() {
         while (!server.isClosed()) {
@@ -43,6 +55,8 @@ public final class Synchronizer implements AutoCloseable {
             DataInputStream in = new DataInputStream(socket.getInputStream());
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
             String[] hello = Wire.read(in);
+            // OpenDraft-style direct addresses and opaque relay codes discover the lobby on this same socket.
+            if(hello.length==1&&hello[0].equals("INVITE")){Wire.write(out,"INVITE",secret,Match.VERSION);hello=Wire.read(in);}
             if (hello.length != 5 || !hello[0].equals("HELLO") || !hello[1].equals(Match.VERSION) || !hello[2].equals(secret)) { Wire.write(out,"ERROR","Wrong invite or Rummage version."); return; }
             synchronized (match) {
                 String id;
@@ -112,13 +126,25 @@ public final class Synchronizer implements AutoCloseable {
         }
     }
     public static void main(String[] args) throws Exception {
-        int port = args.length > 0 ? Integer.parseInt(args[0]) : 25570;
-        Synchronizer s = new Synchronizer(port);
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> { try { s.close(); } catch (IOException ignored) {} }));
-        System.out.println("Rummage " + Match.VERSION + " listening on TCP " + s.port());
-        System.out.println("Invite: " + s.invite(args.length>1?args[1]:InetAddress.getLocalHost().getHostAddress()));
-        if(args.length>2){Relay.Host relay=new Relay.Host(args[2],s.port(),s.secret);Runtime.getRuntime().addShutdownHook(new Thread(relay::close));Thread.ofVirtual().start(()->{try{while(relay.code.isEmpty())Thread.sleep(200);System.out.println("Relay invite: RM-"+relay.code);}catch(InterruptedException ignored){}});}
-        else System.out.println("Direct play needs a reachable address. Pass a TLS relay endpoint as the third argument to enable short invites.");
-        new CountDownLatch(1).await();
+        int preferred=25570;
+        for(int i=0;i<args.length;i++){
+            if(args[i].equals("--port"))preferred=Integer.parseInt(args[++i]);
+            else if(args[i].equals("--relay"))CloudRelay.url=args[++i];
+            else if(args[i].equals("--no-relay"))CloudRelay.url="";
+            else if(i==0&&!args[i].startsWith("--"))preferred=Integer.parseInt(args[i]);
+            else if(i==2&&!args[i].startsWith("--"))CloudRelay.url=args[i];
+            else if(i!=1||args[i].startsWith("--"))throw new IllegalArgumentException("Usage: java -jar rummage.jar [--port 25570] [--relay https://worker,... | --no-relay]");
+        }
+        Synchronizer server=openAnyPort(preferred);
+        AutoHosting sharing=new AutoHosting(server.port(),System.out::println);
+        Runtime.getRuntime().addShutdownHook(new Thread(()->{sharing.close();try{server.close();}catch(IOException ignored){}}));
+        System.out.println("Rummage "+Match.VERSION+" listening on TCP "+server.port());
+        System.out.println("Preparing an invite automatically…");
+        String previous="";
+        while(true){
+            var reach=sharing.reach();String state=reach.code()+reach.note();
+            if(!state.equals(previous)){previous=state;System.out.println(reach.note());if(!reach.code().isBlank())System.out.println("Invite: "+reach.code());}
+            Thread.sleep(250);
+        }
     }
 }

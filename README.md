@@ -39,7 +39,7 @@ Display names identify players inside a lobby. Rummage does not ask for Microsof
 | Step | Host / leader | Other players |
 | --- | --- | --- |
 | **1. Open** | Title screen → **Rummage**; enter a display name. | Open Rummage and enter a display name. |
-| **2. Connect** | Choose a connection method below, then **Create lobby → Copy invite**. | Paste the invite and press **Join lobby**. |
+| **2. Connect** | Press **Create lobby**, wait for the connection note, then **Copy invite**. Setup happens automatically. | Paste the invite and press **Join lobby**. |
 | **3. Configure** | Set seed, seconds and rounds. Open **Rules / Preferences** for optional modes, then save. | Check the player list and agreed rules. |
 | **4. Start** | Press **Start match** and keep the lobby screen open. | Keep the lobby screen open so your match world can load. |
 | **5. Find** | Stand on the displayed target block before the timer reaches zero. | The same target and deadline apply to everyone. |
@@ -134,7 +134,6 @@ Biome-aware selection covers **oak planks, dried kelp, bamboo, moss, terracotta 
 | HUD scale (%) | **100** | **50–200**; automatically clamped to fit the screen. |
 | Fullbright enabled | **Off** | Your local choice, subject to the leader's rule. |
 | Keep worlds | **0 — keep all** | **1–1000** to enable retention and keep that many newest eligible worlds. |
-| Relay address | Blank | The same `tls://hostname:port` for everyone using a relay. |
 | Update manifest URL | Blank | An HTTPS update-feed address supplied by the release maintainer. |
 | Trusted public key | Blank | The maintainer's trusted Ed25519 public key. |
 
@@ -152,69 +151,85 @@ Chest loot uses vanilla generation. Matching seeds and supported sequences help 
 
 ## Play with friends
 
-Choose the connection method **before creating the lobby**.
+**Create lobby → wait for the connection note → Copy invite.** Friends paste the code and press **Join lobby**. No relay address, Cloudflare account, certificate or router setup is needed for the normal flow.
 
-| Method | Host setup | Friend setup | Invite |
-| --- | --- | --- | --- |
-| **Same LAN / Wi-Fi** | Leave **Host address** blank, or enter the correct LAN address. Allow the host's TCP port through its firewall. | Be on a network that permits devices to reach each other. | `BS1-…` |
-| **VPN** | Enter the reachable VPN address in **Host address**. | Join the same reachable VPN network. | `BS1-…` |
-| **Port forwarding** | Forward TCP **25570** to the host and enter its reachable public hostname/address. | Use the copied invite. | `BS1-…` |
-| **TLS relay** | Configure a reachable relay under **Preferences → Network / Updates → Relay address**. | Configure the **same relay address**. | `RM-…` |
+Rummage uses the connection system from OpenDraft, including its built-in Cloudflare Worker endpoint. Your game tries these steps automatically, in order:
 
-**No public relay is bundled or configured.** A relay server is included for someone to host; setup is provided below. Rummage does not automatically open router ports with UPnP.
+| Order | What the game does | What you see |
+| --- | --- | --- |
+| **1. Cloudflare** | Opens a WebSocket connection to the built-in Worker and obtains a short invite. The synchronizer stays in the host's game. | A code like **K7QM-2D9X** and **Friends anywhere can join with this code.** |
+| **2. Router / UPnP** | If the Worker cannot be reached, asks the home router to forward the synchronizer's TCP port. | A longer invite containing the LAN and public addresses. Joining tries both simultaneously. |
+| **3. Same network** | If automatic forwarding fails, still makes a direct invite and explains the restriction. If the router reports a private/provider address, treats it as CGNAT. | **Only people on your network can join**, with the port number and an explanation. |
 
-| Connection detail | What to know |
+| Automatic behavior | Details |
 | --- | --- |
-| Host port | In-game hosting listens on TCP **25570**. |
-| Blank host address | Uses the machine's detected LAN address. If it chooses the wrong adapter, enter the correct address before hosting. |
-| Direct invites | Contain the address, port and lobby secret. Share privately. Direct traffic is unencrypted. |
-| Relay invites | **Copy invite** switches to an `RM-` code once relay registration succeeds. Players need no inbound router port. TLS protects each connection to the relay; the operator can read relayed messages. |
-| Host closes Minecraft | The embedded synchronizer closes and everyone loses the lobby. Use the standalone option below to keep it independent. |
+| Port selection | Tries TCP **25570**, then another free port if it is occupied. The invite contains the actual port. |
+| Address discovery | Uses the router's local/public addresses when available; otherwise finds a LAN address and uses `api.ipify.org` for the public-address lookup when needed. |
+| Router compatibility | Discovers UPnP Internet Gateway Device v1/v2, supports WANIPConnection/WANPPPConnection, and retries a rejected permanent mapping with a one-day lease. |
+| Leaving / quitting | Removes the automatic router mapping. A shutdown hook also handles normal game exit. |
+| Temporary Worker disconnect | Tries to reclaim the **same code** using its private host key for up to **five minutes**. Joining players reconnect automatically. |
+| Expired Worker code | Tells the host to leave and create a new lobby. It does not silently replace an established short code with another connection method. |
+| Several Worker addresses | Hosting tries them in order; joining asks all of them at once and uses the one with that lobby. |
+| Manual joining | The join field also accepts `host`, `host:port`, or `[IPv6]:port`, for a VPN/tunnel address or a manually forwarded port. |
+| Older invites | Existing `BS1-` direct invites remain supported. Older `RM-` invites need their original custom TLS endpoint; use a new automatic invite for the normal flow. |
+
+**Share invites privately.** They provide access to your lobby. Direct connections are unencrypted. Cloudflare connections use TLS, but the Worker operator can read the relayed messages. A port mapping does not guarantee access through an ISP's CGNAT, and a public-IP lookup does not prove a port is reachable; the connection note stays conservative in those cases.
+
+If both automatic internet methods fail:
+
+| Situation | Fallback |
+| --- | --- |
+| Friends on the same LAN / Wi-Fi | Use the direct invite. The network must allow devices to reach each other; some dorm/public networks block this. |
+| Router has UPnP disabled | Enable UPnP, or manually forward the displayed TCP port to the host. The long invite already includes available addresses. |
+| ISP uses CGNAT / phone hotspot / restricted network | Use a reachable VPN or tunnel, such as Tailscale, ZeroTier or playit.gg. Friends enter its host address and the displayed port in the join field. |
+| Wrong LAN adapter / address | Join using the correct reachable address and port directly. |
+| macOS asks for local-network access | Allow Minecraft to discover devices so it can reach the router. |
+
+The host's Minecraft process owns the synchronizer. Closing it ends the lobby even when Cloudflare is carrying the connection. Run the standalone option below if the lobby should be independent of a player's game.
 
 <details>
 <summary><strong>Run a standalone synchronizer</strong></summary>
 
-Needs **Java 25**, but no Minecraft installation or Fabric dependencies at runtime. From the directory containing the built jar:
+Needs **Java 25**, but no Minecraft installation or Fabric dependencies at runtime:
 
 ```sh
-java -jar build/libs/rummage-0.1.1.jar 25570 YOUR_REACHABLE_HOST
+java -jar build/libs/rummage-0.1.1.jar
 ```
 
-Replace `YOUR_REACHABLE_HOST` with the LAN, VPN or public address friends can reach. The terminal prints a direct invite. The **first player to join becomes leader**; everyone joins through the Rummage lobby screen.
+The terminal prepares the connection automatically and prints its invite. The **first player to join becomes leader**; everyone joins through Rummage's lobby screen.
 
-To also register with a relay:
+| Optional flag | Effect |
+| --- | --- |
+| `--port 25570` | Prefer a particular listening port; fall back to a free one if occupied. |
+| `--relay https://worker.example.com,https://backup.example.com` | Override the built-in Worker list. |
+| `--no-relay` | Skip Cloudflare and try UPnP/direct connection. |
 
-```sh
-java -jar build/libs/rummage-0.1.1.jar 25570 YOUR_REACHABLE_HOST tls://relay.example.com:25571
-```
-
-Wait for the terminal to print the `RM-` invite. Every client must configure that relay endpoint. Closing the synchronizer still ends the lobby.
+Closing the synchronizer ends the lobby and removes its router mapping.
 
 </details>
 
 <details>
-<summary><strong>Host your own TLS relay</strong></summary>
+<summary><strong>Advanced: optional Worker override or deployment</strong></summary>
 
-Use a reachable machine with **Java 25**, a hostname and a TLS certificate valid for that hostname. Import the certificate and private key into a Java-compatible **PKCS12 keystore**, open the relay's TCP port, then start:
+Players can use the built-in endpoint without deploying anything:
 
-```sh
-java -Djavax.net.ssl.keyStore=/secure/relay.p12 -Djavax.net.ssl.keyStorePassword=YOUR_KEYSTORE_PASSWORD -cp build/libs/rummage-0.1.1.jar dev.rummage.net.Relay 25571
+```text
+https://opendraft-relay.opendraftmcserver.workers.dev
 ```
 
-Replace the example paths and password with your deployment's values. Keep credentials in private service configuration rather than shared history or source control. Supervise the relay process if it should stay available.
+To use alternative compatible Workers, set `relay=https://your-worker.example.com` in `config/rummage.properties`. Several comma-separated addresses are supported. An empty `relay=` uses the built-in endpoint. To disable Cloudflare explicitly, use `relay=off`. Everyone using an override must use the same Worker list. Restart Minecraft after changing this advanced file setting; normal players need no relay configuration.
 
-| Relay property | Behavior |
-| --- | --- |
-| Client setting | `tls://relay.example.com:25571`, identical for all lobby members. |
-| Certificates | Normal certificate and hostname verification; remote connections require TLS. |
-| Router setup | Only the relay needs a reachable inbound port. Players connect outward. |
-| Host reconnects | Code ownership is reserved for **five minutes** after disconnect. |
-| Capacity | Up to **128 concurrent connections**, with bounded frames and socket timeouts. |
-| Persistence | Messages and match state are not persisted by the relay. |
-| Privacy | TLS ends at the relay, so the operator can read traffic. |
-| Intended use | A small friends-group service; it is not hardened public matchmaking. |
+The optional Worker source is in `relay/src/index.js`. To deploy a separate copy with Node.js and your own Cloudflare account:
 
-Plain `tcp://` relay endpoints are supported only on loopback for local tests. A relay does not preserve a lobby whose synchronizer has stopped.
+```sh
+cd relay
+npx wrangler login
+npx wrangler deploy
+```
+
+Deployment prints the Worker URL. Put it in the advanced setting above, or change `CloudRelay.DEFAULT_URL` when distributing a build with a different default. The deployment config uses a separate `rummage-relay` name; it does not redeploy the existing OpenDraft Worker.
+
+The inherited Worker uses Durable Objects and WebSocket hibernation, hashes host recovery keys, reserves disconnected rooms for five minutes, and limits each room to 32 relay connections (Rummage's game limit remains eight). Worker availability and account limits can cause automatic fallback. Rummage does not download or run a `cloudflared` binary; it connects directly over WebSockets.
 
 </details>
 
@@ -248,7 +263,7 @@ Cleanup only considers **marked Rummage worlds**. Ordinary saves, unmarked world
 
 To update manually, close Minecraft, remove the older Rummage jar from `mods`, put the new jar there, and restart. Everyone in a lobby needs the same mod version.
 
-For signed updates, obtain the **HTTPS manifest URL** and **trusted public key** from the release maintainer, then enter them under **Preferences → Network / Updates**.
+For signed updates, obtain the **HTTPS manifest URL** and **trusted public key** from the release maintainer, then enter them under **Preferences → Updates**.
 
 | Step | Action |
 | --- | --- |
@@ -288,9 +303,9 @@ Publish the jar and manifest at reachable HTTPS URLs, such as release assets, an
 | --- | --- |
 | Rummage button is missing | Check the Fabric profile, Minecraft version, Fabric API and the selected instance's `mods` folder. |
 | Wrong invite or version | Make sure everyone has **0.1.1**, remove duplicate jars, and copy a fresh invite. |
-| Friends cannot join a direct invite | Check the advertised address, firewall and TCP 25570 reachability. Use a VPN or relay if direct access is unavailable. |
-| `RM-` invite will not connect | Everyone needs the same reachable relay endpoint with a valid TLS certificate. |
-| Hosting fails | Check whether another lobby/process is already using TCP 25570. |
+| Friends cannot join a direct invite | Check the displayed port, host firewall and address reachability. The fallback note explains whether only LAN access is available. |
+| Short invite will not connect | Wait if the host is recovering its connection. If the code expired, create a new lobby. Check any advanced Worker override matches on all clients. |
+| Hosting is preparing an invite | Let the automatic Worker/UPnP checks finish. An occupied TCP 25570 is handled automatically. |
 | Match world does not open | Save and Quit your current world, reopen the lobby, then choose **Join match world**. |
 | Loading or seed search takes a long time | Wait for the slowest client; loading has a five-minute timeout per attempt. Relax filters or leave them blank. Random filters try up to eight worlds. |
 | The HUD is missing or too large | Press **H**, check **Show HUD**, or reduce **HUD scale (%)**. |
@@ -315,12 +330,12 @@ Requires **JDK 25**. The wrapper downloads Gradle **9.7.1** and dependencies on 
 | `./gradlew test` | Run the custom engine/integration suite through the standard test task. |
 | `powershell -ExecutionPolicy Bypass -File tools/test.ps1` | Run engine/network tests on Windows without downloading Minecraft or Gradle. |
 
-The custom `engineTest` runner currently passes **376 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **15 mixin targets and shadow fields**. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
+The custom `engineTest` runner currently passes **419 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **15 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-0.1.1.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
 
 <details>
 <summary><strong>Developer checks before publishing</strong></summary>
 
-Test two Minecraft clients through the relay: inspect rules on both, try a failing random-seed filter, start with lookout, toggle the HUD/fullbright, check the race kit and complete a block. Let a deadline expire, vote a draw, and reach sudden death. Restart a non-host client and recover its world. Confirm ordinary worlds are unaffected by the lighting, loot and fair-play hooks. Exercise a signed update against a disposable mods directory.
+Test two Minecraft clients through the automatic connection: inspect rules on both, try a failing random-seed filter, start with lookout, toggle the HUD/fullbright, check the race kit and complete a block. Let a deadline expire, vote a draw, and reach sudden death. Restart a non-host client and recover its world. Confirm ordinary worlds are unaffected by the lighting, loot and fair-play hooks. Exercise a signed update against a disposable mods directory.
 
 | Source folder | Responsibility |
 | --- | --- |
@@ -336,6 +351,6 @@ Test two Minecraft clients through the relay: inspect rules on both, try a faili
 | Topic | Details |
 | --- | --- |
 | Fair play | Completion reports are trusted. Local restrictions help enforce agreed rules but are not an anti-cheat system. |
-| Hosting | Match state lives in synchronizer memory. A server restart ends its lobby. No public relay or update service is deployed by this repository. |
+| Hosting | Match state lives in synchronizer memory. A server restart ends its lobby. The built-in OpenDraft Cloudflare Worker is used automatically; no production update feed is preconfigured. |
 | Version history | Each released version has its own file under `changelogs/`. This README describes current gameplay. |
-| License and credits | New code is MIT licensed. The architecture was inspired by OpenDraft; its preserved reference retains its original authorship. No OpenDraft code, Draftout goal art or panorama assets are bundled. Minecraft and Fabric dependencies retain their own licenses and are not bundled in the distributable jar. |
+| License and credits | New code is MIT licensed. The architecture was inspired by OpenDraft; its preserved reference retains its original authorship. MIT-licensed OpenDraft connection code is included, with its license packaged under `META-INF/licenses/`. No Draftout goal art or panorama assets are bundled. Minecraft and Fabric dependencies retain their own licenses and are not bundled in the distributable jar. |

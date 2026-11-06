@@ -9,19 +9,20 @@ import java.security.SecureRandom;
 
 public final class LobbyScreen extends Screen {
     private final RummageClient mod;
-    private EditBox name, invite, address, seed, seconds, rounds, chat;
+    private EditBox name, invite, seed, seconds, rounds, chat;
+    private Button copyInvite;
     private String layout="";
     private int left, top, panel;
     public LobbyScreen(RummageClient mod) { super(Component.literal("Rummage")); this.mod=mod; }
     private String layoutKey() { Snapshot s=mod.connection==null?null:mod.connection.state; return s==null ? "join" : s.phase()+":"+s.leader().equals(mod.connection.id); }
     @Override protected void init() {
-        clearWidgets(); layout=layoutKey(); panel=Math.min(520,width-24); left=(width-panel)/2; top=Math.max(40,(height-300)/2);
+        clearWidgets(); copyInvite=null; layout=layoutKey(); panel=Math.min(520,width-24); left=(width-panel)/2; top=Math.max(40,(height-300)/2);
         Snapshot s=mod.connection==null?null:mod.connection.state;
         if(s==null) {
-            name=field(left,top+20,panel/2-4,"Display name",mod.name,24);
-            address=field(left+panel/2+4,top+20,panel/2-4,"Host address (optional)","",255);
+            name=field(left,top+20,panel,"Display name",mod.name,24);
+
             invite=field(left,top+60,panel,"Invite code","",512);
-            button("Create lobby",left,top+86,panel/2-4,()->mod.host(name.getValue(),address.getValue()));
+            button("Create lobby",left,top+86,panel/2-4,()->mod.host(name.getValue()));
             button("Join lobby",left+panel/2+4,top+86,panel/2-4,()->mod.join(invite.getValue(),name.getValue()));
             button("Recover session",left,top+112,panel,mod::recover).active=!mod.preferences.get("token","").isEmpty();
             button("Preferences",left,top+138,panel/3-4,()->minecraft.gui.setScreen(new SettingsScreen(mod,this)));
@@ -29,7 +30,7 @@ public final class LobbyScreen extends Screen {
             button("Updates",left+2*panel/3,top+138,panel/3,()->minecraft.gui.setScreen(new UpdateScreen(mod,this)));
         } else {
             int half=panel/2;
-            button("Copy invite",left,top+20,half/2-4,()->minecraft.keyboardHandler.setClipboard(mod.invite));
+            copyInvite=button("Copy invite",left,top+20,half/2-4,()->minecraft.keyboardHandler.setClipboard(mod.invite));copyInvite.active=!mod.invite.isBlank();
             button("Players",left+half/2,top+20,half/2-4,()->minecraft.gui.setScreen(new PlayersScreen(mod,this)));
             button("Leave lobby",left+half+4,top+20,half-4,()->{mod.leave();rebuildWidgets();});
             if(s.phase().equals("LOBBY")) {
@@ -59,7 +60,7 @@ public final class LobbyScreen extends Screen {
     }
     private EditBox field(int x,int y,int w,String hint,String value,int max) { EditBox e=new EditBox(font,x,y,w,20,Component.literal(hint));e.setMaxLength(max);e.setHint(Component.literal(hint));e.setValue(value);return addRenderableWidget(e); }
     private Button button(String text,int x,int y,int w,Runnable action) { return addRenderableWidget(Button.builder(Component.literal(text),b->action.run()).bounds(x,y,w,20).build()); }
-    @Override public void tick(){if(!layout.equals(layoutKey()))rebuildWidgets();}
+    @Override public void tick(){if(!layout.equals(layoutKey()))rebuildWidgets();if(copyInvite!=null)copyInvite.active=!mod.invite.isBlank();}
     @Override public boolean isPauseScreen(){return false;}
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float delta) {
         g.fill(0,0,width,height,0xF00D171B);
@@ -67,10 +68,11 @@ public final class LobbyScreen extends Screen {
         g.centeredText(font,"Separate worlds. Same seed. Beat the clock.",width/2,28,0xFFB1C5BE);
         Snapshot s=mod.connection==null?null:mod.connection.state;
         if(s==null) {
-            label(g,"DISPLAY NAME",left,top+8);label(g,"HOST ADDRESS (OPTIONAL)",left+panel/2+4,top+8);label(g,"INVITE CODE",left,top+48);
+            label(g,"DISPLAY NAME",left,top+8);label(g,"INVITE CODE OR HOST:PORT",left,top+48);
             if(mod.connection!=null)label(g,mod.connection.status,left,height-40);
         } else {
             label(g,mod.connection.connected ? "LOBBY  /  "+s.phase()+"  /  "+s.players().size()+" PLAYERS" : mod.connection.status,left,top+6);
+            if(mod.host!=null){label(g,mod.relayStatus,left,top+42);}
             if(s.phase().equals("LOBBY")){label(g,"SEED (BLANK = RANDOM)",left,top+52);label(g,"SECONDS       ROUNDS",left+panel/2+4,top+52);}
             else label(g,s.phase().equals("FINISHED")?s.result():RummageClient.displayBlock(s.block())+"  /  "+s.secondsLeft()+"s",left,top+50);
             int y=top+(s.phase().equals("LOBBY")?144:118);

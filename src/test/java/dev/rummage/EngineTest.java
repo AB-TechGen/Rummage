@@ -38,6 +38,7 @@ public final class EngineTest {
         Snapshot snapshot=Snapshot.decode(Snapshot.encode(m,5004));check(snapshot.players().size()==2&&snapshot.round()==1,"Snapshot serialization");
         network();
         features(); relay(); relayTls(); recovery(); storageAndUpdates();
+        checks+=dev.rummage.net.ConnectionTest.run();
         System.out.println("PASS: "+checks+" assertions, including real TCP lobby integration.");
     }
     static void await(BooleanSupplier condition)throws Exception{long end=System.nanoTime()+5_000_000_000L;while(!condition.getAsBoolean()&&System.nanoTime()<end)Thread.sleep(20);check(condition.getAsBoolean(),"Network condition timed out");}

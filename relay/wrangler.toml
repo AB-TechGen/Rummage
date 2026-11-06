@@ -1,0 +1,13 @@
+# Optional Rummage Worker deployment; normal players use the built-in endpoint. See the root README.
+name = "rummage-relay"
+main = "src/index.js"
+compatibility_date = "2026-06-01"
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "Lobby"
+
+# The free plan only offers Durable Objects backed by SQLite.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Lobby"]

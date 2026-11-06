@@ -1,0 +1,1 @@
+{"required":true,"package":"dev.rummage.client","compatibilityLevel":"JAVA_25","client":["PauseMixin"],"injectors":{"defaultRequire":1}}

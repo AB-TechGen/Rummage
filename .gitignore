@@ -1,0 +1,7 @@
+.gradle/
+.gradle-home/
+build/
+run/
+api.txt
+*.log
+.idea/

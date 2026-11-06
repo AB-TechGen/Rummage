@@ -10,4 +10,8 @@ dependencies {
 java { sourceCompatibility = JavaVersion.VERSION_25; targetCompatibility = JavaVersion.VERSION_25; withSourcesJar() }
 jar { from('LICENSE'); manifest { attributes 'Main-Class': 'dev.rummage.net.Synchronizer' } }
 tasks.register('engineTest', JavaExec) { dependsOn testClasses; classpath = sourceSets.test.runtimeClasspath; mainClass = 'dev.rummage.EngineTest' }
-check.dependsOn engineTest
+tasks.named('test') {
+    dependsOn engineTest
+    // Assertions run through EngineTest.main; there are no JUnit/TestNG tests to discover.
+    failOnNoDiscoveredTests = false
+}

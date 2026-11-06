@@ -5,13 +5,15 @@ import java.util.*;
 /** Single authoritative state machine, synchronized by its transport. Times are monotonic milliseconds. */
 public final class Match {
     public enum Phase { LOBBY, LOADING, COUNTDOWN, ROUND, INTERMISSION, FINISHED }
-    public static final String VERSION = "0.1.0";
+    public static final String VERSION = "0.1.1";
     public static final long RECONNECT_MS = 300_000;
     public static final class Player {
         public final String id, name;
         public boolean connected = true, ready, alive = true, complete;
         public int score;
         public long disconnectedAt;
+        public String dimension = "minecraft:overworld";
+        public int ping;
         public Player(String id, String name) { this.id = id; this.name = name; }
     }
     public final LinkedHashMap<String, Player> players = new LinkedHashMap<>();
@@ -20,6 +22,40 @@ public final class Match {
     public long seed, deadline;
     public int round, roundSeconds = 300, maxRounds = 20;
     private boolean solo;
+    public MatchRules rules = MatchRules.DEFAULT;
+    public final Set<String> excluded = new HashSet<>(), drawVotes = new HashSet<>();
+    public long drawDeadline;
+    public int graceMillis, seedAttempts;
+    public boolean randomSeed;
+    public boolean worldApproved;
+    public void rules(String id, MatchRules value, boolean random) {
+        requireLeader(id);
+        if(phase!=Phase.LOBBY)throw new IllegalArgumentException("Settings are locked during a match.");
+        rules=value; randomSeed=random;
+    }
+    public void worldReport(String id, String match, Set<String> blocked, boolean accepted, long now) {
+        requireLeader(id);
+        if(phase!=Phase.LOADING || !matchId.equals(match))return;
+        if(!accepted) {
+            if(randomSeed && ++seedAttempts<8) { seed=new Random(seed).nextLong(); begin(now); }
+            else { phase=Phase.FINISHED; result="Seed filter not met. Change filters or seed and retry."; }
+            return;
+        }
+        if(rules.biomeTargets())for(String block:blocked)if(Set.of("minecraft:bamboo_block","minecraft:moss_block","minecraft:terracotta","minecraft:snow_block","minecraft:oak_planks","minecraft:dried_kelp_block").contains(block))excluded.add(block);
+        worldApproved=true;
+    }
+    public void voteDraw(String id, long now) {
+        Player p=player(id);
+        if(phase==Phase.LOBBY || phase==Phase.FINISHED || !p.alive || !p.connected)return;
+        if(drawVotes.isEmpty())drawDeadline=now+30_000;
+        if(!drawVotes.add(id))drawVotes.remove(id);
+        checkDraw(now);
+    }
+    private void checkDraw(long now) {
+        if(now>=drawDeadline){drawVotes.clear();return;}
+        var voters=players.values().stream().filter(p->p.alive&&p.connected).toList();
+        if(!voters.isEmpty()&&voters.stream().allMatch(p->drawVotes.contains(p.id))) {phase=Phase.FINISHED;result="Draw agreed by all active players.";drawVotes.clear();}
+    }
 
     public Player join(String name) {
         if (phase != Phase.LOBBY) throw new IllegalArgumentException("Match in progress; wait for the next lobby.");
@@ -45,9 +81,13 @@ public final class Match {
         requireLeader(id);
         if (phase != Phase.LOBBY || players.isEmpty()) throw new IllegalArgumentException("Return to the lobby first.");
         if (players.values().stream().anyMatch(p -> !p.connected)) throw new IllegalArgumentException("Wait for away players or remove them by returning to the lobby.");
+        begin(now);
+    }
+    private void begin(long now) {
         matchId = UUID.randomUUID().toString();
         phase = Phase.LOADING; deadline = now + 300_000; round = 0; target = ""; result = "";
         solo = players.size() == 1;
+        excluded.clear(); drawVotes.clear();worldApproved=false;
         players.values().forEach(p -> { p.ready = false; p.alive = true; p.complete = false; p.score = 0; });
     }
     public void ready(String id, String match, long worldSeed) {
@@ -58,6 +98,7 @@ public final class Match {
         Player p = player(id);
         if (phase != Phase.ROUND || now >= deadline || !matchId.equals(match) || this.round != round || !target.equals(block) || !p.alive || !p.connected || p.complete) return;
         p.complete = true; p.score++;
+        drawVotes.clear();
     }
     public void disconnect(String id, long now) { Player p = players.get(id); if (p != null) { p.connected = false; p.disconnectedAt = now; } }
     public void reconnect(String id, long now) {
@@ -76,7 +117,7 @@ public final class Match {
         requireLeader(id);
         if (phase != Phase.FINISHED && phase != Phase.LOADING) throw new IllegalArgumentException("Finish the match first.");
         players.values().removeIf(p -> !p.connected);
-        phase = Phase.LOBBY; round = 0; deadline = 0; target = ""; result = "";
+        phase = Phase.LOBBY; round = 0; deadline = 0; target = ""; result = "";drawVotes.clear();drawDeadline=0;
         players.values().forEach(p -> { p.alive = true; p.ready = false; p.complete = false; p.score = 0; });
         chooseLeader();
     }
@@ -88,20 +129,22 @@ public final class Match {
         }
         chooseLeader();
         if (phase == Phase.LOBBY || phase == Phase.FINISHED) return;
+        checkDraw(now);
+        if(phase==Phase.FINISHED)return;
         if (checkWinner()) return;
         if (phase == Phase.LOADING) {
-            if (players.values().stream().filter(p -> p.alive).allMatch(p -> p.ready && p.connected)) { phase = Phase.COUNTDOWN; deadline = now + 5000; }
+            if (worldApproved && players.values().stream().anyMatch(p->p.alive&&p.connected) && players.values().stream().filter(p -> p.alive && p.connected).allMatch(p -> p.ready)) { phase = Phase.COUNTDOWN; deadline = now + 5000 + rules.lookoutSeconds()*1000L; }
             else if (now >= deadline) { phase = Phase.FINISHED; result = "World loading timed out. Return to lobby to retry."; }
         } else if (phase == Phase.COUNTDOWN && now >= deadline) nextRound(now);
         else if (phase == Phase.ROUND) {
-            if (now >= deadline) { players.values().stream().filter(p -> !p.complete).forEach(p -> p.alive = false); endRound(now); }
+            if (now >= deadline + graceMillis) { players.values().stream().filter(p -> !p.complete).forEach(p -> p.alive = false); endRound(now); }
             else if (players.values().stream().filter(p -> p.alive).allMatch(p -> p.complete)) endRound(now);
         } else if (phase == Phase.INTERMISSION && now >= deadline) nextRound(now);
     }
-    private void nextRound(long now) { round++; target = BlockPool.draw(seed, round, target); players.values().forEach(p -> p.complete = false); phase = Phase.ROUND; deadline = now + roundSeconds * 1000L; }
+    private void nextRound(long now) { round++; target = BlockPool.draw(seed, round, target, excluded); players.values().forEach(p -> p.complete = false); phase = Phase.ROUND; int seconds=rules.suddenDeath() && !solo && round>maxRounds ? Math.max(10,roundSeconds/(1+round-maxRounds)) : roundSeconds; deadline = now + seconds * 1000L; }
     private void endRound(long now) {
         if (checkWinner()) return;
-        if (round >= maxRounds) { finishSurvivors("Completed all rounds: "); return; }
+        if (round >= maxRounds && (!rules.suddenDeath() || solo)) { finishSurvivors("Completed all rounds: "); return; }
         phase = Phase.INTERMISSION; deadline = now + 5000;
     }
     private boolean checkWinner() {

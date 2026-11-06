@@ -19,7 +19,8 @@ final class PlayersScreen extends Screen {
         if(s!=null)for(var p:s.players()){
             String status=!p.connected()?"away":!p.alive()?"eliminated":p.complete()?"found":p.ready()?"ready":"waiting";
             g.text(font,font.plainSubstrByWidth((p.id().equals(s.leader())?"* ":"  ")+p.name(),width/2-25),16,row,0xFFFFFFFF);
-            g.text(font,p.score()+" pts / "+status,width/2,row,0xFFBDCEC8);row+=18;
+            g.text(font,font.plainSubstrByWidth(p.score()+" pts / "+status+" / "+p.ping()+"ms",width/2-16),width/2,row,0xFFBDCEC8);
+            g.text(font,p.dimension().replace("minecraft:",""),20,row+11,0xFF8FA49D);row+=28;
         }
         super.extractRenderState(g,x,y,delta);
     }

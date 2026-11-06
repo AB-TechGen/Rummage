@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "rummage",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "name": "Rummage",
   "description": "Separate worlds. Same seed. Find your block before time runs out.",
   "environment": "client",

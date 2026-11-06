@@ -21,7 +21,8 @@ public final class Synchronizer implements AutoCloseable {
         server = new ServerSocket(port);
         match.seed = new SecureRandom().nextLong();
         Thread.ofVirtual().name("rummage-accept").start(this::accept);
-        clock.scheduleAtFixedRate(() -> { synchronized (match) { match.tick(Snapshot.now()); tokens.values().removeIf(id -> !match.players.containsKey(id)); broadcast(Snapshot.encode(match, Snapshot.now())); } }, 0, 200, TimeUnit.MILLISECONDS);
+        match.graceMillis=300;
+        clock.scheduleAtFixedRate(() -> { synchronized (match) { long now=Snapshot.now(); match.tick(now); for(Peer p:peers.values())if(now-p.pingSent>=2000){p.pingSent=now;p.nonce=UUID.randomUUID().toString();p.send("PROBE",p.nonce);} tokens.values().removeIf(id -> !match.players.containsKey(id)); broadcast(Snapshot.encode(match, now)); } }, 0, 100, TimeUnit.MILLISECONDS);
     }
     public int port() { return server.getLocalPort(); }
     public String invite(String host) { return "BS1-" + Wire.pack(host, ""+port(), secret); }
@@ -72,10 +73,15 @@ public final class Synchronizer implements AutoCloseable {
                         String id = peer.id;
                         switch (f[0]) {
                             case "PING" -> peer.send("PONG");
+                            case "PROBE_REPLY" -> { if(f[1].equals(peer.nonce)){int rtt=(int)Math.min(2000,now-peer.pingSent);peer.lag=Math.min(300,rtt/2);match.players.get(id).ping=rtt;peer.nonce="";} }
+                            case "RULES" -> match.rules(id,dev.rummage.core.MatchRules.decode(f[1]),Boolean.parseBoolean(f[2]));
+                            case "WORLD" -> match.worldReport(id,f[1],f[2].isEmpty()?Set.of():Set.of(f[2].split(",")),Boolean.parseBoolean(f[3]),now);
+                            case "DRAW" -> match.voteDraw(id,now);
+                            case "DIMENSION" -> { if(f[1].matches("[a-z0-9_.-]+:[a-z0-9_./-]+")&&f[1].length()<100)match.players.get(id).dimension=f[1]; }
                             case "CONFIG" -> match.configure(id, Long.parseLong(f[1]),Integer.parseInt(f[2]),Integer.parseInt(f[3]));
-                            case "START" -> match.start(id, now);
+                            case "START" -> { match.seedAttempts=0; match.start(id, now); }
                             case "READY" -> match.ready(id,f[1],Long.parseLong(f[2]));
-                            case "CLAIM" -> match.claim(id,f[1],Integer.parseInt(f[2]),f[3],now);
+                            case "CLAIM" -> match.claim(id,f[1],Integer.parseInt(f[2]),f[3],now-peer.lag);
                             case "FORFEIT" -> match.forfeit(id);
                             case "RESET" -> match.reset(id);
                             case "LEAVE" -> { match.leave(id,now); tokens.values().removeIf(id::equals); return; }
@@ -97,6 +103,7 @@ public final class Synchronizer implements AutoCloseable {
     private static final class Peer {
         final String id; final Socket socket; final DataOutputStream out;
         final BlockingQueue<String[]> queue = new ArrayBlockingQueue<>(64);
+        long pingSent; int lag; String nonce="";
         Peer(String id, Socket socket, DataOutputStream out) { this.id=id; this.socket=socket; this.out=out; }
         void send(String... f) { if (!queue.offer(f)) try { socket.close(); } catch (IOException ignored) {} }
         void writeLoop() {
@@ -110,7 +117,8 @@ public final class Synchronizer implements AutoCloseable {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> { try { s.close(); } catch (IOException ignored) {} }));
         System.out.println("Rummage " + Match.VERSION + " listening on TCP " + s.port());
         System.out.println("Invite: " + s.invite(args.length>1?args[1]:InetAddress.getLocalHost().getHostAddress()));
-        System.out.println("For remote play use a reachable host/VPN address and port. No relay is bundled.");
+        if(args.length>2){Relay.Host relay=new Relay.Host(args[2],s.port(),s.secret);Runtime.getRuntime().addShutdownHook(new Thread(relay::close));Thread.ofVirtual().start(()->{try{while(relay.code.isEmpty())Thread.sleep(200);System.out.println("Relay invite: RM-"+relay.code);}catch(InterruptedException ignored){}});}
+        else System.out.println("Direct play needs a reachable address. Pass a TLS relay endpoint as the third argument to enable short invites.");
         new CountDownLatch(1).await();
     }
 }

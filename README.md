@@ -4,7 +4,9 @@ A Minecraft **26.3 Fabric client mod**, inspired by OpenDraft's separate-world a
 
 Find the target block and **stand on top of it** before the timer expires. Everyone gets the same target. Players who miss it are eliminated; the last survivor wins. Play alone to practice, or with up to eight players.
 
-## Included in 0.1.0
+## Included in 0.1.1
+
+Version 0.1.1 adds biome-aware targets, seed filters, saved preferences, crash recovery, a resizable block-icon HUD, relay invites, latency compensation, lookout, standardized loot, draw voting, world retention, richer standings, fair-play controls, and signed updates. Optional sudden death, a race preset, and fullbright are available in **Rules / Preferences**. See [0.1.1 details](docs/RELEASE_0.1.1.md) and [relay/update deployment](docs/DEPLOYMENT.md).
 
 - Title-screen lobby, display names, invite copying, lobby chat and player standings.
 - Fresh survival worlds created automatically on the shared seed.
@@ -14,13 +16,13 @@ Find the target block and **stand on top of it** before the timer expires. Every
 - Curated block pool: common blocks first, more crafting/mining from round 4, Nether/rare resources from round 9. Consecutive targets never repeat.
 - Five-second intermission once all surviving players finish a round. Inventory and world progress carry between rounds.
 - Forfeit, elimination, shared victory at the round cap, and a draw if everyone fails together.
-- Automatic connection retries with a five-minute reserved slot while the game stays open. The clock continues during a disconnect.
+- Automatic connection retries with a five-minute reserved slot, including recovery after restarting Minecraft while the synchronizer remains online. The clock continues during a disconnect.
 - A standalone synchronizer using the same jar, without Minecraft dependencies at runtime.
 
 ## Install and play
 
 1. Install Minecraft **26.3**, **Java 25**, Fabric Loader **0.19.5+**, and Fabric API **0.165.0+26.3**.
-2. Put `rummage-0.1.0.jar` from `build/libs/` into your Minecraft `mods` directory alongside Fabric API. Every player needs the same mod version.
+2. Put `rummage-0.1.1.jar` from `build/libs/` into your Minecraft `mods` directory alongside Fabric API. Every player needs the same mod version.
 3. Open **Rummage** at the top right of the title screen. Enter a display name.
 4. One player presses **Create lobby**, then **Copy invite**. Others paste the invite and press **Join lobby**.
 5. The leader chooses settings and presses **Start match**. Keep the lobby open: each client creates its match world automatically. If you are already in a world, Save and Quit first, then reopen the lobby.
@@ -33,14 +35,14 @@ Names are local lobby identities; Rummage does not request Microsoft credentials
 
 The host listens on TCP **25570**. A blank host-address field advertises the machine's detected LAN address. If that selects the wrong adapter, enter the correct LAN/VPN address before creating the lobby.
 
-**Invite codes encode an address, port and lobby secret; they do not provide NAT traversal.** For friends outside your LAN, use a reachable VPN address or port forwarding and enter the reachable address before hosting. Allow the port through your firewall as needed. Share invites privately. This initial transport is unencrypted and is intended for trusted friends/networks.
+**Direct `BS1-` invites encode an address, port and lobby secret.** For direct play outside your LAN, use a reachable VPN address or port forwarding. Alternatively, configure the same **TLS relay address** on every client, then create a lobby and share its short `RM-` invite. Relay connections use TLS and require no inbound ports on players' routers. A relay server is included, but no public relay is configured or deployed by default. Share invites privately. Direct connections remain unencrypted; the relay operator can see relayed messages.
 
 The host's Minecraft process owns the lobby. If it closes, everyone loses the lobby. To keep it independent, run:
 
 ```sh
-java -jar build/libs/rummage-0.1.0.jar 25570
+java -jar build/libs/rummage-0.1.1.jar 25570
 # Optionally advertise a particular reachable address:
-java -jar build/libs/rummage-0.1.0.jar 25570 your-vpn-or-public-host
+java -jar build/libs/rummage-0.1.1.jar 25570 your-vpn-or-public-host
 ```
 
 The terminal prints an invite; the first player to join becomes leader.
@@ -55,7 +57,7 @@ Requires JDK 25. The Gradle wrapper downloads Gradle 9.7.1 and dependencies on t
 .\gradlew.bat build
 ```
 
-`build/libs/rummage-0.1.0.jar` is both the client mod and standalone synchronizer. `build` runs the deterministic engine tests and local TCP integration tests. To run these tests without downloading Minecraft or Gradle, on Windows:
+`build/libs/rummage-0.1.1.jar` is both the client mod and standalone synchronizer. `build` runs the deterministic engine tests and local TCP integration tests. To run these tests without downloading Minecraft or Gradle, on Windows:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/test.ps1
@@ -63,13 +65,13 @@ powershell -ExecutionPolicy Bypass -File tools/test.ps1
 
 ## Scope and current limitations
 
-This is an initial implementation, not feature parity with OpenDraft. It does not include a hosted relay, UPnP, seed/biome filtering, standardized vanilla RNG, lookout flight, latency compensation, automatic updates, draw voting or save cleanup. The original reference is in [docs/OPENDRAFT_REFERENCE.md](docs/OPENDRAFT_REFERENCE.md).
+This implements Rummage adaptations of OpenDraft features, rather than full OpenDraft parity. The original reference is in [docs/OPENDRAFT_REFERENCE.md](docs/OPENDRAFT_REFERENCE.md). No public relay or update feed is deployed; configure those using [the deployment guide](docs/DEPLOYMENT.md). UPnP is not implemented.
 
-- Worlds use vanilla generation and loot RNG. Matching seeds and targets do not guarantee identical drops or nearby access to every target.
+- Worlds use vanilla terrain generation. Biome checks sample a grid and are conservative; they do not guarantee a particular block is present or reachable. Standard loot RNG covers block drops, mob loot tables, and piglin bartering, not every random event in Minecraft.
 - The synchronizer trusts each mod's completion reports. This is friendly competition, not an anti-cheat system.
-- Claims count when received, before the server deadline. Claims completed offline are only sent if the target is still underfoot and the same round is active after reconnecting.
-- Reconnect tokens and the synchronizer's state are in memory. Closing/restarting Minecraft loses the client's reconnect identity. A server restart loses the match.
-- Match worlds are retained in `saves/Rummage <match-id>`. No files are automatically deleted. During the same game session, **Join match world** reopens the saved match world if you Save and Quit mid-match.
+- Claims receive up to 300 ms of compensation based on server-measured round-trip time, with a 300 ms deadline settlement window. This is an estimate, not proof of the completion time. Offline claims are not backdated.
+- Reconnect credentials and the match-world path persist locally. **Recover session** resumes within the synchronizer's five-minute reservation. Synchronizer state remains in memory: a host/server process restart loses its lobby.
+- Match worlds are retained in `saves/Rummage <match-id>`. Retention defaults to **all**. Setting **Keep worlds** above zero enables cleanup on the title screen; only marked, unlocked Rummage worlds are eligible, and protected favourites are kept. The most recent session's world is also protected during automatic cleanup for recovery.
 - Waiting and eliminated players are spectators. Pause screens do not pause an active match world; the synchronizer clock keeps running.
 
 The Java sources have been compiled against cached Minecraft 26.3/Fabric APIs, and the engine/network tests have been run locally. In-game rendering, automatic world creation and multi-machine play still require a Minecraft smoke test; compilation alone does not verify them.

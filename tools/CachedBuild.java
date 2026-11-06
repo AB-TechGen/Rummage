@@ -28,7 +28,7 @@ class CachedBuild {
         Manifest manifest=new Manifest();
         manifest.getMainAttributes().putValue("Manifest-Version","1.0");
         manifest.getMainAttributes().putValue("Main-Class","dev.rummage.net.Synchronizer");
-        Path output=Path.of("build/libs/rummage-0.1.0.jar");Files.createDirectories(output.getParent());
+        Path output=Path.of("build/libs/rummage-0.1.1.jar");Files.createDirectories(output.getParent());
         try(JarOutputStream jar=new JarOutputStream(Files.newOutputStream(output),manifest)){
             addTree(jar,classes);addTree(jar,Path.of("src/main/resources"));
             jar.putNextEntry(new JarEntry("LICENSE"));Files.copy(Path.of("LICENSE"),jar);jar.closeEntry();

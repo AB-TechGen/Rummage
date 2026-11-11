@@ -44,11 +44,11 @@ public final class AutoHosting implements AutoCloseable {
     private void share(Network network){
         try {
             HostedRelay connected=network.relay(port,log,new CloudRelay.Watcher(){
-                public void reconnecting(){update(false,"Connection interrupted. Recovering the same invite; players reconnect automatically.",true);}
-                public void back(){update(true,"Friends anywhere can join with this code.",false);}
+                public void reconnecting(){update(false,"Relay connection interrupted. Reconnection is in progress.",true);}
+                public void back(){update(true,"Internet lobby connection available.",false);}
                 public void lost(){update(false,"This invite has expired. Leave the lobby and create it again.",false);}
             });
-            synchronized(this){if(closed){connected.close();return;}relay=connected;reach=new Reach(connected.code(),true,"Friends anywhere can join with this code.",false,port);}
+            synchronized(this){if(closed){connected.close();return;}relay=connected;reach=new Reach(connected.code(),true,"Internet lobby connection available.",false,port);}
             return;
         }catch(IOException|RuntimeException e){log.accept("Online connection unavailable; trying the router automatically.");}
         if(closed)return;
@@ -64,7 +64,7 @@ public final class AutoHosting implements AutoCloseable {
         String internet=Invite.isPublic(mapping.external())?mapping.external():null;
         Reach result;
         if(mapping.opened()&&internet!=null){
-            result=new Reach(Invite.encode(lan,internet,port),true,"Friends anywhere can join with this code.",false,port);
+            result=new Reach(Invite.encode(lan,internet,port),true,"Internet lobby connection available.",false,port);
         }else if(mapping.opened()){
             result=new Reach(Invite.encode(lan,null,port),false,"Only people on your network can join (port "+port+"). Your provider uses another private network (CGNAT).",false,port);
         }else{

@@ -6,20 +6,22 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import com.mojang.blaze3d.platform.InputConstants;
 
 public final class LobbyScreen extends Screen {
     private final RummageClient mod;
     private EditBox name,invite,chat;
     private String layout="",draftChat="",draftInvite="";
     private boolean showCode;
-    private Button copy,start;
+    private Button copy,start,send;
     private int side;
     public LobbyScreen(RummageClient mod){super(Component.literal("Rummage Lobby"));this.mod=mod;}
     private String layoutKey(){var c=mod.connection;var s=c==null?null:c.state;return s==null?"join":s.phase()+":"+s.leader().equals(c.id);}
     private Button button(String label,int x,int y,int w,Runnable action){return addRenderableWidget(Button.builder(Component.literal(label),b->action.run()).bounds(x,y,w,20).build());}
     private EditBox field(String label,int x,int y,int w,String value,int max){var f=new EditBox(font,x,y,w,18,Component.literal(label));f.setMaxLength(max);f.setValue(value);return addRenderableWidget(f);}
     @Override protected void init(){
-        layout=layoutKey();copy=null;start=null;chat=null;int cx=width/2,w=Math.min(220,width-24);
+        layout=layoutKey();copy=null;start=null;send=null;chat=null;int cx=width/2,w=Math.min(220,width-24);
         var s=mod.connection==null?null:mod.connection.state;
         if(s==null){
             name=field("Your name",cx-w/2,49,w,mod.name,24);name.setResponder(v->mod.name=v);
@@ -41,9 +43,14 @@ public final class LobbyScreen extends Screen {
             button("Leave Lobby",width-8-side,height-28,side/2-2,()->{mod.leave();rebuildWidgets();});
             start=button(s.phase().equals("LOBBY")?"Start":"Match",width-6-side/2,height-28,side/2-2,()->{if(s.phase().equals("LOBBY"))startMatch();else minecraft.gui.setScreen(new MatchScreen(mod));});
             int chatW=Math.max(80,width-side-28);
-            chat=field("Chat",8,height-28,chatW,draftChat,240);chat.setHint(Component.literal("Say something… (Enter to send)"));chat.setResponder(v->draftChat=v);
+            chat=field("Chat",8,height-28,chatW-48,draftChat,240);
+            send=button("Send",8+chatW-44,height-28,44,this::sendChat);chat.setHint(Component.literal("Say something… (Enter to send)"));chat.setResponder(v->draftChat=v);
         }
         tick();
+    }
+    private void sendChat(){
+        var c=mod.connection;if(chat==null||c==null||!c.connected||chat.getValue().isBlank())return;
+        c.send("CHAT",chat.getValue());chat.setValue("");setFocused(chat);chat.setFocused(true);
     }
     private String chatLabel(){return "Player chat: "+(mod.preferences.flag("playerChat",true)?"on":"off");}
     private String keepLabel(){int keep=mod.preferences.number("keepWorlds",0);return "Old worlds: "+(keep<=0?"keep all":"keep "+keep);}
@@ -55,8 +62,14 @@ public final class LobbyScreen extends Screen {
         else if(mod.preferences.flag("randomSeed",true))c.send("CONFIG",""+new SecureRandom().nextLong(),""+c.state.seconds(),""+c.state.maxRounds());
         c.send("START");
     }
-    @Override public void tick(){if(!layout.equals(layoutKey())){rebuildWidgets();return;}if(copy!=null)copy.active=!mod.invite.isBlank();if(start!=null){var c=mod.connection;start.active=c!=null&&c.connected&&c.state!=null&&(!c.state.phase().equals("LOBBY")||c.state.leader().equals(c.id));}}
-    @Override public boolean keyPressed(KeyEvent e){if(e.key()==257||e.key()==335){if(chat!=null&&chat.isFocused()){if(mod.connection.connected){if(!chat.getValue().isBlank())mod.connection.send("CHAT",chat.getValue());chat.setValue("");}return true;}if(layoutKey().equals("join")&&invite!=null&&invite.isFocused()){join();return true;}}return super.keyPressed(e);}
+    @Override public void tick(){if(!layout.equals(layoutKey())){rebuildWidgets();return;}if(send!=null)send.active=mod.connection!=null&&mod.connection.connected;if(copy!=null)copy.active=!mod.invite.isBlank();if(start!=null){var c=mod.connection;start.active=c!=null&&c.connected&&c.state!=null&&(!c.state.phase().equals("LOBBY")||c.state.leader().equals(c.id));}}
+    @Override public boolean keyPressed(KeyEvent e){
+        if(e.key()==InputConstants.KEY_RETURN||e.key()==InputConstants.KEY_NUMPADENTER){
+            if(chat!=null&&chat.isFocused()){sendChat();return true;}
+            if(layoutKey().equals("join")&&invite!=null&&invite.isFocused()){join();return true;}
+        }
+        return super.keyPressed(e);
+    }
     @Override public boolean isPauseScreen(){return false;}
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float delta){
         var s=mod.connection==null?null:mod.connection.state;
@@ -64,13 +77,17 @@ public final class LobbyScreen extends Screen {
         else{
             Ui.panel(g,8,8,side,62+s.players().size()*13);g.text(font,"Lobby ("+s.players().size()+"/8)",13,13,Ui.GOLD);
             String code=mod.invite.isBlank()?"Preparing invite…":showCode?mod.invite:"XXXX-XXXX";Ui.text(g,font,code,13,29,side-10,Ui.TEXT);
-            int y=72;for(var p:s.players()){Ui.text(g,font,(p.id().equals(s.leader())?"★ ":"")+p.name()+(p.id().equals(mod.connection.id)?" (you)":"")+(!p.connected()?" (away)":""),13,y,side-10,p.connected()?Ui.TEXT:Ui.MUTED);y+=13;}
+            int y=72;for(var p:s.players()){Ui.text(g,font,(p.id().equals(s.leader())?"★ ":"")+p.name()+(p.id().equals(mod.connection.id)?" (you)":"")+(!p.connected()?" (away)":""),13,y,side-10,p.connected()?mod.color(p.id()):Ui.MUTED);y+=13;}
             int x=width-8-side;Ui.panel(g,x,8,side,107);g.text(font,"Match Settings",x+5,13,Ui.GOLD);
             String[] lines={s.seconds()+" seconds per round",s.maxRounds()+" rounds"+(s.rules().suddenDeath()?" + sudden death":""),"Lookout: "+s.rules().lookoutSeconds()+"s","Biome: "+FilterScreen.label(s.rules().biomeFilter()),"Structure: "+FilterScreen.label(s.rules().structureFilter()),s.leader().equals(mod.connection.id)?"You are the leader.":"The leader chooses the rules."};
             y=29;for(String line:lines){Ui.text(g,font,line,x+5,y,side-10,Ui.TEXT);y+=14;}
-            int bottom=height-48,chatTop=Math.max(78+s.players().size()*13,164),chatW=Math.max(80,width-side-28);String[] messages=mod.messages.toArray(String[]::new);int count=Math.max(0,(bottom-chatTop)/11);for(int i=Math.max(0,messages.length-count);i<messages.length;i++){Ui.text(g,font,messages[i],10,chatTop,chatW,Ui.TEXT);chatTop+=11;}
+            int bottom=height-48,chatTop=Math.max(78+s.players().size()*13,164),chatW=Math.max(80,width-side-28);
+            var chatLines=new ArrayList<net.minecraft.util.FormattedCharSequence>();
+            for(Component message:mod.messages)chatLines.addAll(font.split(message,chatW));
+            int count=Math.max(0,(bottom-chatTop)/11);
+            for(int i=Math.max(0,chatLines.size()-count);i<chatLines.size();i++){g.text(font,chatLines.get(i),10,chatTop,Ui.TEXT);chatTop+=11;}
             String status=!mod.error.isBlank()?mod.error:!mod.connection.connected?mod.connection.status:!mod.relayStatus.isBlank()?mod.relayStatus:s.phase().equals("LOBBY")?"Start when everyone is here.":"Match in progress — open Match to return.";
-            if(width>=650)Ui.wrap(g,font,status,side+20,16,width-2*side-40,Ui.GOLD);else Ui.text(g,font,status,8,height-42,width-16,Ui.GOLD);
+            if(width>=650)Ui.wrap(g,font,status,side+20,16,width-2*side-40,Ui.MUTED);else Ui.text(g,font,status,8,height-42,width-16,Ui.MUTED);
         }
         super.extractRenderState(g,mx,my,delta);
     }

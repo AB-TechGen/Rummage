@@ -17,7 +17,7 @@ final class PlayersScreen extends Screen {
         var c=mod.connection;var s=c==null?null:c.state;int w=Math.min(420,width-24),left=(width-w)/2;
         Ui.panel(g,left,10,w,26+(s==null?0:s.players().size()*22));g.centeredText(font,"Player Standings",width/2,18,Ui.GOLD);
         int row=37;if(s!=null)for(var p:s.players()){
-            Ui.text(g,font,(p.id().equals(s.leader())?"★ ":"")+p.name()+(p.id().equals(c.id)?" (you)":""),left+8,row,w/2-12,Ui.TEXT);
+            Ui.text(g,font,(p.id().equals(s.leader())?"★ ":"")+p.name()+(p.id().equals(c.id)?" (you)":""),left+8,row,w/2-12,mod.color(p.id()));
             Ui.text(g,font,p.score()+" pts · "+Ui.status(s,p)+" · "+p.ping()+"ms",left+w/2,row,w/2-8,p.complete()?Ui.GREEN:Ui.TEXT);
             Ui.text(g,font,p.dimension().replace("minecraft:",""),left+8,row+10,w-16,Ui.MUTED);row+=22;
         }

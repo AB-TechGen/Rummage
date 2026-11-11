@@ -37,7 +37,7 @@ public final class EngineTest {
         try{Wire.read(new DataInputStream(new ByteArrayInputStream(new byte[]{0,2,0,0})));throw new AssertionError("Oversized frame accepted");}catch(IOException expected){checks++;}
         Snapshot snapshot=Snapshot.decode(Snapshot.encode(m,5004));check(snapshot.players().size()==2&&snapshot.round()==1,"Snapshot serialization");
         network();
-        features(); relay(); relayTls(); recovery(); storageAndUpdates();
+        features(); social(); relay(); relayTls(); recovery(); storageAndUpdates();
         checks+=dev.rummage.net.ConnectionTest.run();
         System.out.println("PASS: "+checks+" assertions, including real TCP lobby integration.");
     }
@@ -58,6 +58,52 @@ public final class EngineTest {
         }
         try(Synchronizer server=new Synchronizer(0);Socket s=new Socket("127.0.0.1",server.port())){
             s.setSoTimeout(2000);Wire.write(new DataOutputStream(s.getOutputStream()),"HELLO","bad-version",server.secret,"name","");check(Wire.read(new DataInputStream(s.getInputStream()))[0].equals("ERROR"),"Version mismatch rejected");
+        }
+    }
+    static void social()throws Exception{
+        Match finished=running(2,2);String originalLeader=finished.leader;
+        finished.forfeit(originalLeader);finished.tick(6000);long returnsAt=finished.deadline;
+        check(returnsAt==6000+Match.RESULT_MS,"Result display has an eight-second return deadline");
+        finished.disconnect(originalLeader,6001);finished.tick(returnsAt-1);
+        check(finished.phase==Match.Phase.FINISHED,"Results remain visible until the return deadline");
+        finished.tick(returnsAt);
+        check(finished.phase==Match.Phase.LOBBY&&finished.players.size()==1,"Automatic return works without the original leader");
+        check(finished.players.values().stream().allMatch(p->p.alive&&!p.ready&&p.score==0),"Automatic return resets match state");
+        finished.start(finished.leader,returnsAt+1);finished.tick(returnsAt+2);
+        check(finished.phase==Match.Phase.LOADING,"Old return timer cannot reset the next match");
+        Match colors=new Match();for(int i=0;i<8;i++)colors.join("Colour "+i);
+        check(colors.players.values().stream().map(p->p.colorIndex).distinct().count()==8,"Players receive distinct colour slots");
+        var colored=colors.players.values().iterator().next();int slot=colored.colorIndex;
+        colors.disconnect(colored.id,1);colors.reconnect(colored.id,2);
+        check(colored.colorIndex==slot,"Colour survives reconnect");
+        var snapshot=Snapshot.decode(Snapshot.encode(colors,3));
+        check(snapshot.players().stream().allMatch(p->p.colorIndex()==colors.players.get(p.id()).colorIndex),"Colour assignments travel in snapshots");
+        check(PlayerColors.color(0,true)==0xFF00BCD4&&PlayerColors.color(1,true)==PlayerColors.color(0,true),"Local player is always cyan");
+        check(PlayerColors.color(0,false)!=PlayerColors.color(1,false),"Other player colours use the OpenDraft palette");
+        var aEvents=new java.util.concurrent.ConcurrentLinkedQueue<ChatEvent>();
+        var bEvents=new java.util.concurrent.ConcurrentLinkedQueue<ChatEvent>();
+        try(Synchronizer server=new Synchronizer(0);
+            LobbyConnection a=new LobbyConnection(server.invite("127.0.0.1"),"Solo Alice",s->{},"",t->{},"",aEvents::add)){
+            await(()->a.state!=null);
+            a.send("CHAT","Solo lobby message");
+            await(()->aEvents.stream().anyMatch(e->e.kind()==ChatEvent.Kind.CHAT&&e.text().equals("Solo lobby message")));
+            check(aEvents.stream().filter(e->e.kind()==ChatEvent.Kind.CHAT).allMatch(e->e.playerId().equals(a.id)&&e.name().equals("Solo Alice")),"Solo lobby chat echoes with authenticated sender identity");
+            try(LobbyConnection b=new LobbyConnection(server.invite("127.0.0.1"),"Bob",s->{},"",t->{},"",bEvents::add)){
+                await(()->b.state!=null&&a.state.players().size()==2);
+                b.send("CHAT","Multiplayer message");
+                await(()->aEvents.stream().anyMatch(e->e.text().equals("Multiplayer message"))&&bEvents.stream().anyMatch(e->e.text().equals("Multiplayer message")));
+                check(aEvents.stream().filter(e->e.text().equals("Multiplayer message")).allMatch(e->e.playerId().equals(b.id)&&e.name().equals("Bob")),"Multiplayer chat preserves server-established sender identity");
+                b.send("ADV","not-a-match","minecraft:story/mine_stone","task","Stale advancement");
+                LobbyConnection leader=a.state.leader().equals(a.id)?a:b;
+                leader.send("CONFIG","123","30","2");leader.send("START");await(()->a.state.phase().equals("LOADING")&&b.state.phase().equals("LOADING"));
+                leader.send("WORLD",leader.state.matchId(),"","true");a.send("READY",a.state.matchId(),"123");b.send("READY",b.state.matchId(),"123");await(()->a.state.phase().equals("COUNTDOWN")&&b.state.phase().equals("COUNTDOWN"));
+                a.send("ADV",a.state.matchId(),"minecraft:story/mine_stone","task","Stone Age");
+                a.send("ADV",a.state.matchId(),"minecraft:story/mine_stone","task","Stone Age");
+                a.send("CHAT","Advancement barrier");
+                await(()->bEvents.stream().anyMatch(e->e.text().equals("Advancement barrier")));
+                check(aEvents.stream().filter(e->e.kind()==ChatEvent.Kind.ADVANCEMENT).count()==1&&bEvents.stream().filter(e->e.kind()==ChatEvent.Kind.ADVANCEMENT).count()==1,"Advancements reach sender and peers once; stale and duplicate reports are excluded");
+                check(bEvents.stream().filter(e->e.kind()==ChatEvent.Kind.ADVANCEMENT).allMatch(e->e.playerId().equals(a.id)&&e.name().equals("Solo Alice")&&e.frame().equals("task")&&e.text().equals("Stone Age")),"Advancement sender, type and title are preserved");
+            }
         }
     }
     static void features(){

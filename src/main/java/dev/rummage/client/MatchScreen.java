@@ -60,7 +60,7 @@ final class MatchScreen extends Screen {
             g.text(font,block,targetX+22,y+25,Ui.TEXT);
         }else Ui.text(g,font,title,x+10,y+25,w-20,Ui.TEXT);
         g.centeredText(font,MatchHud.phaseText(s),width/2,y+40,Ui.MUTED);
-        int row=y+57;for(var p:s.players()){Ui.text(g,font,(p.id().equals(c.id)?"You":p.name())+(p.id().equals(s.leader())?" ★":""),x+10,row,w/2-10,Ui.TEXT);Ui.text(g,font,p.score()+" pts · "+Ui.status(s,p),x+w/2,row,w/2-10,p.complete()?Ui.GREEN:Ui.MUTED);row+=rowHeight();}
+        int row=y+57;for(var p:s.players()){Ui.text(g,font,(p.id().equals(c.id)?"You":p.name())+(p.id().equals(s.leader())?" ★":""),x+10,row,w/2-10,mod.color(p.id()));Ui.text(g,font,p.score()+" pts · "+Ui.status(s,p),x+w/2,row,w/2-10,p.complete()?Ui.GREEN:Ui.MUTED);row+=rowHeight();}
         String note=!c.connected?c.status:!s.drawVotes().isEmpty()?"Draw: "+s.drawVotes().size()+" votes · "+Math.max(0,(s.drawRemaining()-(Snapshot.now()-s.receivedAt())+999)/1000)+"s left":"Stand on the target before time runs out.";
         Ui.text(g,font,note,x+10,row+3,w-20,Ui.MUTED);super.extractRenderState(g,mx,my,delta);
     }

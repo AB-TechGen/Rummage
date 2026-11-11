@@ -6,7 +6,7 @@ Rummage is a Minecraft Fabric mod for **1–8 players**. Everyone explores their
 
 | Current version | Minecraft | Java | Players |
 | --- | --- | --- | --- |
-| **0.1.6** | **26.3** | **25** | **1–8**, including solo practice |
+| **0.2.0** | **26.3** | **25** | **1–8**, including solo practice |
 
 [Install](#install) · [Play](#play) · [Controls](#controls) · [Settings](#settings) · [Play with friends](#play-with-friends) · [Recovery](#disconnects-and-recovery) · [Troubleshooting](#troubleshooting)
 
@@ -18,7 +18,7 @@ Rummage is a Minecraft Fabric mod for **1–8 players**. Everyone explores their
 | Java | **25** |
 | Fabric Loader | **0.19.5 or newer** |
 | Fabric API | **0.165.0+26.3** |
-| Rummage | **rummage-0.1.6.jar**, the same version for every player |
+| Rummage | **rummage-0.2.0.jar**, the same version for every player |
 
 1. Install Fabric Loader for Minecraft 26.3 and select that profile in your launcher.
 2. Get the Rummage jar from a release, a successful GitHub **Actions → Build → Artifacts → rummage** download, or build it using the commands below. Extract the artifact ZIP if using GitHub Actions.
@@ -43,7 +43,7 @@ Display names identify players inside a lobby. Rummage does not ask for Microsof
 | **3. Configure** | Open **Edit Match Settings**, choose the match and world options, then save. | Check the player list and agreed rules. |
 | **4. Start** | Press **Start match** and keep the lobby screen open. | Keep the lobby screen open so your match world can load. |
 | **5. Find** | Stand on the displayed target block before the timer reaches zero. | The same target and deadline apply to everyone. |
-| **6. Play again** | After the result, press **Return to lobby**, then start another match. | Your client saves and leaves the world when the leader returns to the lobby. |
+| **6. Play again** | Results remain visible for eight seconds, then everyone returns to the lobby automatically. Start another match when ready. | Your client saves and leaves the match world automatically. |
 
 **Already in a world?** Save and Quit first, then reopen Rummage. For solo practice, create a lobby and start without inviting anyone.
 
@@ -69,7 +69,7 @@ The HUD turns green and shows **Block found!** when your completion is confirmed
 | Solo player reaches the cap | Practice complete. |
 | Players agree to a draw | The match ends in a draw. |
 
-The compact target HUD sits at the top right. Loading covers the world until everyone is ready, the final countdown appears in the centre, and results appear as a banner. **B** opens match actions over the world; **Lobby / Chat** opens the social lobby. Forfeit requires a second press within four seconds.
+The compact target HUD sits at the top right. Loading covers the world until everyone is ready, the final countdown appears in the centre, and results appear as a banner. **B** opens match actions over the world; **Lobby / Chat** opens the social lobby. Forfeit requires a second press within four seconds. When the game ends, everyone spectates during the eight-second result countdown, then returns to the lobby automatically—even if the original leader disconnected.
 
 Inventory and world progress carry between rounds. A new match creates fresh worlds. Common targets come first; more crafting and mining targets enter the pool at **round 4**, with Nether and rarer targets from **round 9**. Consecutive targets never repeat.
 
@@ -85,7 +85,7 @@ Rebind these under Minecraft **Controls → Key Binds**, in the Rummage categori
 | **P** | Toggle the player standings screen: score, completion/elimination status, dimension and ping. |
 | **H** | Show or hide the target HUD. |
 | **G** | Toggle fullbright, if the leader allows it. |
-| **Enter** | Send lobby chat, or join from the invite field. |
+| **Enter / numpad Enter / Send** | Send lobby chat, including solo lobbies. Enter also joins from the invite field. |
 | **Tab (hold)** | Show standings, dimension icons, scores and ping during play. |
 | **Join match world** | Reopen your existing match world after Save and Quit. |
 | **Forfeit** | Give up your place in the current match. |
@@ -136,6 +136,12 @@ Biome-aware selection covers **oak planks, dried kelp, bamboo, moss, terracotta 
 | Keep worlds | **0 — keep all** | Cycle the **Old worlds** lobby button to keep a limited number of newest eligible worlds. |
 
 Names, match settings, display choices and recovery details are saved in `config/rummage.properties`. That file contains private reconnect credentials; keep it private.
+
+### Shared chat and advancements
+
+Lobby chat works in solo and multiplayer lobbies. Press Enter (including numpad Enter) or click Send. World chat also goes to the lobby when Player chat is on. Your name is cyan; other players use OpenDraft's red/yellow/green/etc. palette, with stable assignments across reconnects. Colours also appear in the lobby and standings.
+
+New announced advancements are shared once with the lobby, using the player's colour and vanilla task/goal/challenge styling. Loading or recovering an existing world does not replay old advancements, and your local vanilla announcement is replaced by the shared coloured message while connected. Relay interruptions and restorations use discreet grey notices; repeated retry notices are limited.
 
 ### Always-on gameplay rules
 
@@ -195,7 +201,7 @@ The host's Minecraft process owns the synchronizer. Closing it ends the lobby ev
 Needs **Java 25**, but no Minecraft installation or Fabric dependencies at runtime:
 
 ```sh
-java -jar build/libs/rummage-0.1.6.jar
+java -jar build/libs/rummage-0.2.0.jar
 ```
 
 The terminal prepares the connection automatically and prints its invite. The **first player to join becomes leader**; everyone joins through Rummage's lobby screen.
@@ -272,7 +278,7 @@ The old Updates screen configured an optional signed update feed. No production 
 | Problem | Try this |
 | --- | --- |
 | Rummage button is missing | Check the Fabric profile, Minecraft version, Fabric API and the selected instance's `mods` folder. |
-| Wrong invite or version | Make sure everyone has **0.1.6**, remove duplicate jars, and copy a fresh invite. |
+| Wrong invite or version | Make sure everyone has **0.2.0**, remove duplicate jars, and copy a fresh invite. |
 | Friends cannot join a direct invite | Check the displayed port, host firewall and address reachability. The fallback note explains whether only LAN access is available. |
 | Short invite will not connect | Wait if the host is recovering its connection. If the code expired, create a new lobby. Check any advanced Worker override matches on all clients. |
 | Hosting is preparing an invite | Let the automatic Worker/UPnP checks finish. An occupied TCP 25570 is handled automatically. |
@@ -294,12 +300,12 @@ Requires **JDK 25**. The wrapper downloads Gradle **9.7.1** and dependencies on 
 
 | Output / command | Purpose |
 | --- | --- |
-| `build/libs/rummage-0.1.6.jar` | Installable client mod, standalone synchronizer and relay. |
-| `build/libs/rummage-0.1.6-sources.jar` | Source archive; do not install as the mod. |
+| `build/libs/rummage-0.2.0.jar` | Installable client mod, standalone synchronizer and relay. |
+| `build/libs/rummage-0.2.0-sources.jar` | Source archive; do not install as the mod. |
 | `./gradlew test` | Run the custom engine/integration suite through the standard test task. |
 | `powershell -ExecutionPolicy Bypass -File tools/test.ps1` | Run engine/network tests on Windows without downloading Minecraft or Gradle. |
 
-The custom `engineTest` runner currently passes **423 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **17 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-0.1.6.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
+The custom `engineTest` runner currently passes **446 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **17 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-0.2.0.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
 
 <details>
 <summary><strong>Developer checks before publishing</strong></summary>

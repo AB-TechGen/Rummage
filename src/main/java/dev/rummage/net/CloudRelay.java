@@ -236,7 +236,7 @@ public final class CloudRelay {
                 players.clear();
                 if (stopped) return;
                 if (key == null || !reconnect()) {
-                    log.accept("lost the connection to the relay");
+                    log.accept("The relay connection could not be restored.");
                     watcher.lost();
                     return;
                 }
@@ -245,7 +245,7 @@ public final class CloudRelay {
 
         /** Gets the same code back with the key, for as long as the relay keeps it after a drop. */
         private boolean reconnect() {
-            log.accept("lost the connection to the relay, getting the code back");
+            log.accept("Relay connection interrupted. Reconnecting…");
             watcher.reconnecting();
             long giveUp = System.currentTimeMillis() + dev.rummage.core.Match.RECONNECT_MS;
             long wait = 1000;
@@ -270,14 +270,14 @@ public final class CloudRelay {
                         }
                         relay = r;
                     }
-                    log.accept("back on the relay with code " + format(code));
+                    log.accept("Relay connection restored.");
                     watcher.back();
                     return true;
                 } catch (Refused e) {
-                    log.accept("the relay won't give the code back: " + e.getMessage());
+                    log.accept("Relay session recovery was declined.");
                     return false;
                 } catch (IOException e) {
-                    log.accept("still can't reach the relay: " + e.getMessage());
+                    log.accept("Relay connection remains unavailable. Retrying…");
                 }
             }
             return false;

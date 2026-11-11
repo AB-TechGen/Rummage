@@ -5,12 +5,14 @@ import java.util.*;
 /** Single authoritative state machine, synchronized by its transport. Times are monotonic milliseconds. */
 public final class Match {
     public enum Phase { LOBBY, LOADING, COUNTDOWN, ROUND, INTERMISSION, FINISHED }
-    public static final String VERSION = "0.1.6";
+    public static final String VERSION = "0.2.0";
+    public static final long RESULT_MS = 8000;
+    private boolean returnScheduled;
     public static final long RECONNECT_MS = 300_000;
     public static final class Player {
         public final String id, name;
         public boolean connected = true, ready, alive = true, complete;
-        public int score;
+        public int score, colorIndex;
         public long disconnectedAt;
         public String dimension = "minecraft:overworld";
         public int ping;
@@ -66,10 +68,12 @@ public final class Match {
         int suffix = 2;
         while (hasName(name)) name = base + " " + suffix++;
         Player p = new Player(UUID.randomUUID().toString(), name);
+        while(hasColor(p.colorIndex))p.colorIndex++;
         players.put(p.id, p);
         if (leader.isEmpty()) leader = p.id;
         return p;
     }
+    private boolean hasColor(int color){return players.values().stream().anyMatch(p->p.colorIndex==color);}
     private boolean hasName(String name) { return players.values().stream().anyMatch(p -> p.name.equalsIgnoreCase(name)); }
     public void configure(String id, long seed, int seconds, int rounds) {
         requireLeader(id);
@@ -85,6 +89,7 @@ public final class Match {
     }
     private void begin(long now) {
         matchId = UUID.randomUUID().toString();
+        returnScheduled=false;
         phase = Phase.LOADING; deadline = now + 300_000; round = 0; target = ""; result = "";
         solo = players.size() == 1;
         excluded.clear(); drawVotes.clear();worldApproved=false;
@@ -116,6 +121,10 @@ public final class Match {
     public void reset(String id) {
         requireLeader(id);
         if (phase != Phase.FINISHED && phase != Phase.LOADING) throw new IllegalArgumentException("Finish the match first.");
+        resetToLobby();
+    }
+    private void resetToLobby(){
+        returnScheduled=false;
         players.values().removeIf(p -> !p.connected);
         phase = Phase.LOBBY; round = 0; deadline = 0; target = ""; result = "";drawVotes.clear();drawDeadline=0;
         players.values().forEach(p -> { p.alive = true; p.ready = false; p.complete = false; p.score = 0; });
@@ -128,7 +137,12 @@ public final class Match {
             }
         }
         chooseLeader();
-        if (phase == Phase.LOBBY || phase == Phase.FINISHED) return;
+        if (phase == Phase.LOBBY) return;
+        if (phase == Phase.FINISHED) {
+            if(!returnScheduled){returnScheduled=true;deadline=now+RESULT_MS;}
+            else if(now>=deadline)resetToLobby();
+            return;
+        }
         checkDraw(now);
         if(phase==Phase.FINISHED)return;
         if (checkWinner()) return;

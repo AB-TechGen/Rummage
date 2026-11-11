@@ -16,7 +16,8 @@ public final class Synchronizer implements AutoCloseable {
     private final Set<Socket> sockets = ConcurrentHashMap.newKeySet();
     private final ScheduledExecutorService clock = Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, "rummage-clock"); t.setDaemon(true); return t; });
     private final Semaphore capacity = new Semaphore(16);
-    private String lastState="";
+    private String lastState="", advancementMatch="", previousPhase="";
+    private final Map<String,Set<String>> announcedAdvancements=new HashMap<>();
     private long lastBroadcast;
     public final String secret = UUID.randomUUID().toString();
     public Synchronizer(int port) throws IOException {
@@ -24,7 +25,7 @@ public final class Synchronizer implements AutoCloseable {
         match.seed = new SecureRandom().nextLong();
         Thread.ofVirtual().name("rummage-accept").start(this::accept);
         match.graceMillis=300;
-        clock.scheduleAtFixedRate(() -> { synchronized (match) { long now=Snapshot.now(); match.tick(now); for(Peer p:peers.values())if(now-p.pingSent>=2000){p.pingSent=now;p.nonce=UUID.randomUUID().toString();p.send("PROBE",p.nonce);} tokens.values().removeIf(id -> !match.players.containsKey(id));
+        clock.scheduleAtFixedRate(() -> { synchronized (match) { long now=Snapshot.now(); match.tick(now); if(match.phase==Match.Phase.FINISHED&&!previousPhase.equals("FINISHED"))broadcast("NOTICE",match.result+" Returning to the lobby shortly.");previousPhase=match.phase.name(); for(Peer p:peers.values())if(now-p.pingSent>=2000){p.pingSent=now;p.nonce=UUID.randomUUID().toString();p.send("PROBE",p.nonce);} tokens.values().removeIf(id -> !match.players.containsKey(id));
             // Clients interpolate the clock. Send changes immediately, otherwise only one refresh per second.
             String[] state=Snapshot.encode(match,now),stable=state.clone();stable[9]="";stable[13]="";
             String signature=Wire.pack(stable);
@@ -72,7 +73,7 @@ public final class Synchronizer implements AutoCloseable {
                 peer = new Peer(id, socket, out);
                 peers.put(id,peer);
                 peer.send("WELCOME",id,token);
-                broadcast("CHAT","Lobby",match.players.get(id).name + " joined.");
+                broadcast("NOTICE",match.players.get(id).name + (hello[4].isEmpty()?" joined the lobby.":" reconnected."));
             }
             Peer writer = peer;
             Thread.ofVirtual().start(writer::writeLoop);
@@ -98,8 +99,14 @@ public final class Synchronizer implements AutoCloseable {
                             case "CLAIM" -> match.claim(id,f[1],Integer.parseInt(f[2]),f[3],now-peer.lag);
                             case "FORFEIT" -> match.forfeit(id);
                             case "RESET" -> match.reset(id);
-                            case "LEAVE" -> { match.leave(id,now); tokens.values().removeIf(id::equals); return; }
-                            case "CHAT" -> { if (f[1].length() > 240) throw new IllegalArgumentException("Chat limit is 240 characters."); broadcast("CHAT",match.players.get(id).name,f[1].replaceAll("[\\p{Cntrl}§]", "")); }
+                            case "LEAVE" -> { broadcast("NOTICE",match.players.get(id).name+" left the lobby.");match.leave(id,now); tokens.values().removeIf(id::equals); return; }
+                            case "ADV" -> {
+                                if(f.length!=5||!f[1].equals(match.matchId)||match.phase==Match.Phase.LOBBY||match.phase==Match.Phase.FINISHED)break;
+                                if(!f[2].matches("[a-z0-9_.-]+:[a-z0-9_./-]+")||f[2].length()>200||!Set.of("task","goal","challenge").contains(f[3])||f[4].length()>160)throw new IllegalArgumentException("Invalid advancement message.");
+                                if(!advancementMatch.equals(match.matchId)){advancementMatch=match.matchId;announcedAdvancements.clear();}
+                                if(announcedAdvancements.computeIfAbsent(id,k->new HashSet<>()).add(f[2]))broadcast("ADV",id,match.players.get(id).name,f[3],f[4].replaceAll("[\\p{Cntrl}§]", ""));
+                            }
+                            case "CHAT" -> { if (f[1].length() > 240) throw new IllegalArgumentException("Chat limit is 240 characters."); broadcast("CHAT",id,match.players.get(id).name,f[1].replaceAll("[\\p{Cntrl}§]", "")); }
                             default -> throw new IllegalArgumentException("Unknown message");
                         }
                     } catch (RuntimeException e) { peer.send("ERROR",e instanceof IllegalArgumentException && e.getMessage()!=null ? e.getMessage() : "Invalid message"); }

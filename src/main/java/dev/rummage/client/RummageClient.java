@@ -33,7 +33,7 @@ public final class RummageClient implements ClientModInitializer {
     public volatile LobbyConnection connection;
     public Synchronizer host;
     public String invite = "", error = "", name = "Player";
-    public final Deque<String> messages = new ConcurrentLinkedDeque<>();
+    public final Deque<Component> messages = new ConcurrentLinkedDeque<>();
     private volatile String worldMatch = "", worldFolder = "";
     private volatile Vec3 spawn;
     private volatile boolean announcedReady;
@@ -48,6 +48,8 @@ public final class RummageClient implements ClientModInitializer {
     private AutoHosting hosting;
     private volatile boolean worldMarked;
     private long lastDimension;
+    private final AdvancementRelay advancements=new AdvancementRelay();
+    private final Map<String,Long> relayNotices=new HashMap<>();
     private boolean recoveringWorld;
     public MatchRules pendingRules;
     public String[] pendingConfig;
@@ -75,6 +77,7 @@ public final class RummageClient implements ClientModInitializer {
             var players=server.getPlayerList().getPlayers();
             if (players.isEmpty()) return;
             var p=players.getFirst();
+            advancements.tick(server,p,c,s);
             if (spawn==null) {spawn=p.position();lookoutY=spawn.y;for(int x=-16;x<=16;x+=16)for(int z=-16;z<=16;z+=16)lookoutY=Math.max(lookoutY,p.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,(int)spawn.x+x,(int)spawn.z+z));lookoutY+=20;}
             if(!worldMarked){try{worlds.mark(worldFolder);worldMarked=true;}catch(Exception e){message("Could not mark match world: "+e.getMessage());}}
             {
@@ -96,7 +99,7 @@ public final class RummageClient implements ClientModInitializer {
                 }
             } else {
                 Snapshot.Player self=s.player(c.id);
-                p.setGameMode(self!=null && self.alive() ? GameType.SURVIVAL : GameType.SPECTATOR);
+                p.setGameMode(self!=null && self.alive() && !s.phase().equals("FINISHED") ? GameType.SURVIVAL : GameType.SPECTATOR);
                 if (s.phase().equals("ROUND") && self!=null && self.alive() && !self.complete() && p.onGround() && Snapshot.now()-lastClaim>250) {
                     String block=BuiltInRegistries.BLOCK.getKey(p.level().getBlockState(BlockPos.containing(p.getX(),p.getY()-0.05,p.getZ())).getBlock()).toString();
                     if (block.equals(s.block())) { c.send("CLAIM",s.matchId(),""+s.round(),block); lastClaim=Snapshot.now(); }
@@ -107,6 +110,13 @@ public final class RummageClient implements ClientModInitializer {
             var c=connection;
             if(c==null||!c.connected||!inMatchWorld()||!preferences.flag("playerChat",true))return true;
             c.send("CHAT",message.substring(0,Math.min(240,message.length())));return false;
+        });
+        net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.ALLOW_GAME.register((message,overlay)->{
+            var c=connection;
+            if(c==null||!c.connected||!inMatchWorld()||overlay)return true;
+            if(message.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents translated)
+                return !Set.of("chat.type.advancement.task","chat.type.advancement.goal","chat.type.advancement.challenge").contains(translated.getKey());
+            return true;
         });
         MatchHud hud=new MatchHud(this);
         HudElementRegistry.addFirst(Identifier.fromNamespaceAndPath("rummage","waiting"),(g,delta)->hud.waiting(g));
@@ -126,6 +136,8 @@ public final class RummageClient implements ClientModInitializer {
         if(inMatchWorld()&&s.phase().equals("LOADING")&&mc.gui.hud.isHidden())mc.gui.hud.toggle();
         if(recoveringWorld&&mc.level==null&&mc.gui.screen() instanceof LobbyScreen&&!s.phase().equals("LOBBY")){recoveringWorld=false;createWorld();}
         if(s.phase().equals("LOADING")&&!s.matchId().equals(worldMatch)&&mc.getSingleplayerServer()!=null&&mc.getSingleplayerServer().getWorldData().getLevelName().equals(worldFolder)){mc.disconnect(new LobbyScreen(this),false);return;}
+        if(s.phase().equals("LOBBY")&&mc.level==null&&mc.gui.screen() instanceof MatchScreen)mc.gui.setScreen(new LobbyScreen(this));
+        if(s.phase().equals("FINISHED")&&inMatchWorld()&&mc.player!=null)mc.gui.hud.setOverlayMessage(Component.literal("Returning to the lobby in "+s.secondsLeft()+"s").withStyle(net.minecraft.ChatFormatting.GRAY),false);
         if (s.phase().equals("LOBBY") && mc.getSingleplayerServer()!=null && mc.getSingleplayerServer().getWorldData().getLevelName().equals(worldFolder)) { mc.disconnect(new LobbyScreen(this),false); return; }
         if (s.phase().equals("LOADING") && !s.matchId().equals(worldMatch) && mc.level==null && mc.gui.screen() instanceof LobbyScreen) createWorld();
         if (s.phase().equals("LOADING") && !c.connected) {announcedReady=false;reportedWorld="";}
@@ -155,12 +167,33 @@ public final class RummageClient implements ClientModInitializer {
     }
     public void join(String code,String playerName) { try { leave(); name=playerName;rememberName(); invite=code.strip();connect(invite,false);error=""; } catch (RuntimeException e) { error="Could not join: "+e.getMessage(); } }
     private void rememberName(){preferences.put("name",name);savePreferences();}
-    private void connect(String code,boolean recovery){pendingRules=null;pendingConfig=null;String token=recovery?preferences.get("token",""):"";preferences.put("recoveryInvite",code);savePreferences();connection=new LobbyConnection(code,name,this::message,token,t->{preferences.put("token",t);savePreferences();},preferences.get("relay",""));}
+    private void connect(String code,boolean recovery){pendingRules=null;pendingConfig=null;String token=recovery?preferences.get("token",""):"";preferences.put("recoveryInvite",code);savePreferences();connection=new LobbyConnection(code,name,this::message,token,t->{preferences.put("token",t);savePreferences();},preferences.get("relay",""),this::message);}
     public void recover(){try{if(connection!=null&&connection.connected){error="Already connected.";return;}if(connection!=null)connection.close();invite=preferences.get("recoveryInvite","");connect(invite,true);recoveringWorld=true;error="";}catch(RuntimeException e){error="Recovery failed: "+e.getMessage();}}
     public void leave() { if(connection!=null) connection.close(); connection=null; if(hosting!=null)hosting.close();hosting=null;relayStatus="";if(host!=null)try {host.close();}catch(Exception ignored){} host=null; invite=""; messages.clear();preferences.put("token","");preferences.put("recoveryInvite","");savePreferences(); }
-    public void message(String text) {
-        messages.addLast(text);while(messages.size()>50)messages.pollFirst();
-        Minecraft mc=Minecraft.getInstance();mc.execute(()->{if(mc.player!=null&&inMatchWorld()&&preferences.flag("playerChat",true))mc.gui.hud.getChat().addClientSystemMessage(Component.literal(text));});
+    public int color(String playerId){
+        var c=connection;var state=c==null?null:c.state;var player=state==null?null:state.player(playerId);
+        return PlayerColors.color(player==null?playerId.hashCode():player.colorIndex(),c!=null&&playerId.equals(c.id));
+    }
+    public void message(String text){message(ChatEvent.notice(text));}
+    public void message(ChatEvent event){
+        Minecraft mc=Minecraft.getInstance();mc.execute(()->{
+            Component line;
+            if(event.kind()==ChatEvent.Kind.CHAT){
+                line=Component.literal("<"+event.name()+"> ").withColor(color(event.playerId())&0xFFFFFF)
+                    .append(Component.literal(event.text()).withStyle(net.minecraft.ChatFormatting.WHITE));
+            }else if(event.kind()==ChatEvent.Kind.ADVANCEMENT){
+                Component who=Component.literal(event.name()).withColor(color(event.playerId())&0xFFFFFF);
+                Component title=Component.literal("["+event.text()+"]").withStyle(event.frame().equals("challenge")?net.minecraft.ChatFormatting.DARK_PURPLE:net.minecraft.ChatFormatting.GREEN);
+                line=Component.translatable("chat.type.advancement."+event.frame(),who,title).withStyle(net.minecraft.ChatFormatting.GRAY);
+            }else{
+                if(event.text().startsWith("Relay ")||event.text().startsWith("The relay ")){
+                    long now=Snapshot.now();Long previous=relayNotices.get(event.text());if(previous!=null&&now-previous<30_000)return;relayNotices.put(event.text(),now);
+                }
+                line=Component.literal(event.text()).withStyle(net.minecraft.ChatFormatting.GRAY);
+            }
+            messages.addLast(line);while(messages.size()>50)messages.pollFirst();
+            if(mc.player!=null&&inMatchWorld()&&(event.kind()!=ChatEvent.Kind.CHAT||preferences.flag("playerChat",true)))mc.gui.hud.getChat().addClientSystemMessage(line);
+        });
     }
     public static String displayBlock(String id) { if(id.isEmpty())return "Waiting for the next block…"; String text=id.replace("minecraft:","").replace('_',' '); return Character.toUpperCase(text.charAt(0))+text.substring(1); }
 }

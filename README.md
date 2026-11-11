@@ -2,11 +2,13 @@
 
 **Same seed. Separate worlds. Find your block. Beat the clock.**
 
+**v1.0.0 — first official release.**
+
 Rummage is a Minecraft Fabric mod for **1–8 players**. Everyone explores their own fresh singleplayer world on the same seed. Each round gives everyone the same target block: stand on it before time runs out or get eliminated. The last survivor wins.
 
 | Current version | Minecraft | Java | Players |
 | --- | --- | --- | --- |
-| **0.2.1** | **26.3** | **25** | **1–8**, including solo practice |
+| **1.0.0** | **26.3** | **25** | **1–8**, including solo practice |
 
 [Install](#install) · [Play](#play) · [Controls](#controls) · [Settings](#settings) · [Play with friends](#play-with-friends) · [Recovery](#disconnects-and-recovery) · [Troubleshooting](#troubleshooting)
 
@@ -18,7 +20,7 @@ Rummage is a Minecraft Fabric mod for **1–8 players**. Everyone explores their
 | Java | **25** |
 | Fabric Loader | **0.19.5 or newer** |
 | Fabric API | **0.165.0+26.3** |
-| Rummage | **rummage-0.2.1.jar**, the same version for every player |
+| Rummage | **rummage-1.0.0.jar**, the same version for every player |
 
 1. Install Fabric Loader for Minecraft 26.3 and select that profile in your launcher.
 2. Get the Rummage jar from a release, a successful GitHub **Actions → Build → Artifacts → rummage** download, or build it using the commands below. Extract the artifact ZIP if using GitHub Actions.
@@ -210,7 +212,7 @@ The host's Minecraft process owns the synchronizer. Closing it ends the lobby ev
 Needs **Java 25**, but no Minecraft installation or Fabric dependencies at runtime:
 
 ```sh
-java -jar build/libs/rummage-0.2.1.jar
+java -jar build/libs/rummage-1.0.0.jar
 ```
 
 The terminal prepares the connection automatically and prints its invite. The **first player to join becomes leader**; everyone joins through Rummage's lobby screen.
@@ -287,7 +289,7 @@ The old Updates screen configured an optional signed update feed. No production 
 | Problem | Try this |
 | --- | --- |
 | Rummage button is missing | Check the Fabric profile, Minecraft version, Fabric API and the selected instance's `mods` folder. |
-| Wrong invite or version | Make sure everyone has **0.2.1**, remove duplicate jars, and copy a fresh invite. |
+| Wrong invite or version | Make sure everyone has **1.0.0**, remove duplicate jars, and copy a fresh invite. |
 | Friends cannot join a direct invite | Check the displayed port, host firewall and address reachability. The fallback note explains whether only LAN access is available. |
 | Short invite will not connect | Wait if the host is recovering its connection. If the code expired, create a new lobby. Check any advanced Worker override matches on all clients. |
 | Hosting is preparing an invite | Let the automatic Worker/UPnP checks finish. An occupied TCP 25570 is handled automatically. |
@@ -309,12 +311,12 @@ Requires **JDK 25**. The wrapper downloads Gradle **9.7.1** and dependencies on 
 
 | Output / command | Purpose |
 | --- | --- |
-| `build/libs/rummage-0.2.1.jar` | Installable client mod, standalone synchronizer and relay. |
-| `build/libs/rummage-0.2.1-sources.jar` | Source archive; do not install as the mod. |
+| `build/libs/rummage-1.0.0.jar` | Installable client mod, standalone synchronizer and relay. |
+| `build/libs/rummage-1.0.0-sources.jar` | Source archive; do not install as the mod. |
 | `./gradlew test` | Run the custom engine/integration suite through the standard test task. |
 | `powershell -ExecutionPolicy Bypass -File tools/test.ps1` | Run engine/network tests on Windows without downloading Minecraft or Gradle. |
 
-The custom `engineTest` runner currently passes **613 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **19 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-0.2.1.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
+The custom `engineTest` runner currently passes **613 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **19 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-1.0.0.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. The maintainer reports extensive in-game solo testing of the release candidate. Multi-machine gameplay has not been newly verified as part of this release promotion.
 
 <details>
 <summary><strong>Developer checks before publishing</strong></summary>

@@ -5,7 +5,7 @@ import java.util.*;
 /** Single authoritative state machine, synchronized by its transport. Times are monotonic milliseconds. */
 public final class Match {
     public enum Phase { LOBBY, LOADING, COUNTDOWN, ROUND, INTERMISSION, FINISHED }
-    public static final String VERSION = "0.2.1";
+    public static final String VERSION = "1.0.0";
     public static final long RESULT_MS = 8000;
     private boolean returnScheduled;
     public static final long RECONNECT_MS = 300_000;

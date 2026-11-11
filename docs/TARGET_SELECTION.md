@@ -1,4 +1,4 @@
-# Target selection in 0.2.1
+# Target selection in 1.0.0
 
 ## What 0.2.0 did
 

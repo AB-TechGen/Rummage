@@ -6,7 +6,7 @@ Rummage is a Minecraft Fabric mod for **1–8 players**. Everyone explores their
 
 | Current version | Minecraft | Java | Players |
 | --- | --- | --- | --- |
-| **0.1.1** | **26.3** | **25** | **1–8**, including solo practice |
+| **0.1.3** | **26.3** | **25** | **1–8**, including solo practice |
 
 [Install](#install) · [Play](#play) · [Controls](#controls) · [Settings](#settings) · [Play with friends](#play-with-friends) · [Recovery](#disconnects-and-recovery) · [Troubleshooting](#troubleshooting)
 
@@ -18,7 +18,7 @@ Rummage is a Minecraft Fabric mod for **1–8 players**. Everyone explores their
 | Java | **25** |
 | Fabric Loader | **0.19.5 or newer** |
 | Fabric API | **0.165.0+26.3** |
-| Rummage | **rummage-0.1.1.jar**, the same version for every player |
+| Rummage | **rummage-0.1.3.jar**, the same version for every player |
 
 1. Install Fabric Loader for Minecraft 26.3 and select that profile in your launcher.
 2. Get the Rummage jar from a release, a successful GitHub **Actions → Build → Artifacts → rummage** download, or build it using the commands below. Extract the artifact ZIP if using GitHub Actions.
@@ -40,7 +40,7 @@ Display names identify players inside a lobby. Rummage does not ask for Microsof
 | --- | --- | --- |
 | **1. Open** | Title screen → **Rummage**; enter a display name. | Open Rummage and enter a display name. |
 | **2. Connect** | Press **Create lobby**, wait for the connection note, then **Copy invite**. Setup happens automatically. | Paste the invite and press **Join lobby**. |
-| **3. Configure** | Set seed, seconds and rounds. Open **Rules / Preferences** for optional modes, then save. | Check the player list and agreed rules. |
+| **3. Configure** | Set seed, seconds and rounds. Open **Edit Settings** for optional modes, then save. | Check the player list and agreed rules. |
 | **4. Start** | Press **Start match** and keep the lobby screen open. | Keep the lobby screen open so your match world can load. |
 | **5. Find** | Stand on the displayed target block before the timer reaches zero. | The same target and deadline apply to everyone. |
 | **6. Play again** | After the result, press **Return to lobby**, then start another match. | Your client saves and leaves the world when the leader returns to the lobby. |
@@ -69,6 +69,8 @@ The HUD turns green and shows **Block found!** when your completion is confirmed
 | Solo player reaches the cap | Practice complete. |
 | Players agree to a draw | The match ends in a draw. |
 
+The compact target HUD sits at the top right. Loading covers the world until everyone is ready, the final countdown appears in the centre, and results appear as a banner. **B** opens match actions over the world; **Lobby / Chat** opens the social lobby. Forfeit requires a second press within four seconds.
+
 Inventory and world progress carry between rounds. A new match creates fresh worlds. Common targets come first; more crafting and mining targets enter the pool at **round 4**, with Nether and rarer targets from **round 9**. Consecutive targets never repeat.
 
 **The clock keeps running while menus are open or a player is disconnected.** Waiting and eliminated players are spectators.
@@ -79,12 +81,12 @@ Rebind these under Minecraft **Controls → Key Binds**, in the Rummage categori
 
 | Default key / button | Action |
 | --- | --- |
-| **B** | Open or close the lobby for chat, match actions and standings. |
+| **B** | Open the match panel during play; open the lobby outside a match. |
 | **P** | Toggle the player standings screen: score, completion/elimination status, dimension and ping. |
 | **H** | Show or hide the target HUD. |
 | **G** | Toggle fullbright, if the leader allows it. |
-| **Players** | Open standings from the lobby. |
-| **Send** | Send the text entered in the lobby chat box. |
+| **Enter** | Send lobby chat, or join from the invite field. |
+| **Tab (hold)** | Show standings, dimension icons, scores and ping during play. |
 | **Join match world** | Reopen your existing match world after Save and Quit. |
 | **Forfeit** | Give up your place in the current match. |
 | **Offer / accept draw** | Start or accept a draw vote; press again to withdraw. |
@@ -93,7 +95,7 @@ Draw votes last **30 seconds** and need every connected surviving player's agree
 
 ## Settings
 
-Open **Preferences** before joining, or **Rules / Preferences** inside a lobby. Use **Previous / Next** to switch pages, then **Save**. Only the leader can change match rules, and those rules lock when a match starts. Local display preferences remain editable.
+Open **Settings** before joining, or **Edit Settings / View Settings** inside a lobby. Choose **Match**, **World**, **Display** or **Updates**, then **Save Settings**. Longer tabs use Previous / Next when needed to fit the window. Hover controls for explanations. Only the leader can change match rules, and those rules lock when a match starts. Local display preferences remain editable.
 
 ### Match and world rules
 
@@ -109,8 +111,8 @@ Open **Preferences** before joining, or **Rules / Preferences** inside a lobby. 
 | Race preset | **Off** | Give starting supplies, reduce ordinary Nether fog and guarantee early pearl trades. |
 | Allow fullbright | **On** | Allow each player to toggle brighter match-world lighting with **G**. |
 | Fair-play controls | **On** | Keep Normal difficulty and restrict commands, LAN publishing, game-mode changes and rule edits. |
-| Required biome ID | Blank | Optional filter, for example `minecraft:plains`. |
-| Required structure ID | Blank | Optional filter, for example `minecraft:village_plains`. |
+| Required biome | Any | Choose a named biome, or enter a custom ID. |
+| Required structure | Any | Choose a named structure, or enter a custom ID. |
 | Search radius | **400** blocks | **100–2000** blocks around spawn for biome checks and requested filters. |
 
 **Seed filtering:** the leader checks a generated world. Random seeds retry up to **eight worlds**; a typed seed that fails is rejected without replacement. These attempts load real worlds and can take time. Blank filters accept any seed. Biomes are sampled on a grid, so the checks cannot guarantee every target block is nearby or reachable.
@@ -131,6 +133,7 @@ Biome-aware selection covers **oak planks, dried kelp, bamboo, moss, terracotta 
 | Setting | Default | What to enter |
 | --- | --- | --- |
 | Show HUD | **On** | Toggle here or with **H**. |
+| Player chat in world | **On** | Relay world chat to the lobby and show lobby messages while playing. |
 | HUD scale (%) | **100** | **50–200**; automatically clamped to fit the screen. |
 | Fullbright enabled | **Off** | Your local choice, subject to the leader's rule. |
 | Keep worlds | **0 — keep all** | **1–1000** to enable retention and keep that many newest eligible worlds. |
@@ -193,7 +196,7 @@ The host's Minecraft process owns the synchronizer. Closing it ends the lobby ev
 Needs **Java 25**, but no Minecraft installation or Fabric dependencies at runtime:
 
 ```sh
-java -jar build/libs/rummage-0.1.1.jar
+java -jar build/libs/rummage-0.1.3.jar
 ```
 
 The terminal prepares the connection automatically and prints its invite. The **first player to join becomes leader**; everyone joins through Rummage's lobby screen.
@@ -239,7 +242,7 @@ The inherited Worker uses Durable Objects and WebSocket hibernation, hashes host
 | --- | --- |
 | Brief network drop | Rummage retries automatically and reserves your slot for **five minutes**. The clock continues. |
 | Minecraft crashed or restarted | Reopen Rummage and press **Recover session** within five minutes. Saved credentials restore your slot and reopen your recorded match world if the synchronizer is still running. |
-| You used Save and Quit mid-match | Open the lobby and choose **Join match world** to return to the same save. |
+| You used Save and Quit mid-match | Open the lobby, select **Match**, then **Join Match World** to return to the same save. |
 | You pressed **Leave lobby** | You leave immediately and clear the saved recovery credentials. |
 | You were away for five minutes | Your reserved slot expires. |
 | The host/synchronizer stopped | Its lobby state is lost; start a new lobby. |
@@ -263,7 +266,7 @@ Cleanup only considers **marked Rummage worlds**. Ordinary saves, unmarked world
 
 To update manually, close Minecraft, remove the older Rummage jar from `mods`, put the new jar there, and restart. Everyone in a lobby needs the same mod version.
 
-For signed updates, obtain the **HTTPS manifest URL** and **trusted public key** from the release maintainer, then enter them under **Preferences → Updates**.
+For signed updates, obtain the **HTTPS manifest URL** and **trusted public key** from the release maintainer, then enter them under **Settings → Updates**.
 
 | Step | Action |
 | --- | --- |
@@ -287,10 +290,10 @@ java tools/SignRelease.java generate /secure/rummage-release-key.pk8
 
 The command refuses to overwrite an existing key and prints its public key. Back up the private key and keep it private. Give users the public key through a trusted channel.
 
-After building a new version, sign its exact jar bytes and intended HTTPS download URL. This example is for a future **0.1.2** release:
+After building a new version, sign its exact jar bytes and intended HTTPS download URL. This example is for a future **0.1.4** release:
 
 ```sh
-java tools/SignRelease.java sign /secure/rummage-release-key.pk8 0.1.2 https://example.com/releases/rummage-0.1.2.jar build/libs/rummage-0.1.2.jar build/update.properties
+java tools/SignRelease.java sign /secure/rummage-release-key.pk8 0.1.4 https://example.com/releases/rummage-0.1.4.jar build/libs/rummage-0.1.4.jar build/update.properties
 ```
 
 Publish the jar and manifest at reachable HTTPS URLs, such as release assets, and distribute the manifest URL. Clients verify the version, URL and SHA-256 together using the pinned public key; the downloaded manifest cannot supply its own trusted key.
@@ -302,11 +305,11 @@ Publish the jar and manifest at reachable HTTPS URLs, such as release assets, an
 | Problem | Try this |
 | --- | --- |
 | Rummage button is missing | Check the Fabric profile, Minecraft version, Fabric API and the selected instance's `mods` folder. |
-| Wrong invite or version | Make sure everyone has **0.1.1**, remove duplicate jars, and copy a fresh invite. |
+| Wrong invite or version | Make sure everyone has **0.1.3**, remove duplicate jars, and copy a fresh invite. |
 | Friends cannot join a direct invite | Check the displayed port, host firewall and address reachability. The fallback note explains whether only LAN access is available. |
 | Short invite will not connect | Wait if the host is recovering its connection. If the code expired, create a new lobby. Check any advanced Worker override matches on all clients. |
 | Hosting is preparing an invite | Let the automatic Worker/UPnP checks finish. An occupied TCP 25570 is handled automatically. |
-| Match world does not open | Save and Quit your current world, reopen the lobby, then choose **Join match world**. |
+| Match world does not open | Save and Quit your current world, reopen the lobby, select **Match**, then **Join Match World**. |
 | Loading or seed search takes a long time | Wait for the slowest client; loading has a five-minute timeout per attempt. Relax filters or leave them blank. Random filters try up to eight worlds. |
 | The HUD is missing or too large | Press **H**, check **Show HUD**, or reduce **HUD scale (%)**. |
 | Fullbright does nothing | Check both your local toggle (**G**) and the leader's **Allow fullbright** rule. |
@@ -325,12 +328,12 @@ Requires **JDK 25**. The wrapper downloads Gradle **9.7.1** and dependencies on 
 
 | Output / command | Purpose |
 | --- | --- |
-| `build/libs/rummage-0.1.1.jar` | Installable client mod, standalone synchronizer and relay. |
-| `build/libs/rummage-0.1.1-sources.jar` | Source archive; do not install as the mod. |
+| `build/libs/rummage-0.1.3.jar` | Installable client mod, standalone synchronizer and relay. |
+| `build/libs/rummage-0.1.3-sources.jar` | Source archive; do not install as the mod. |
 | `./gradlew test` | Run the custom engine/integration suite through the standard test task. |
 | `powershell -ExecutionPolicy Bypass -File tools/test.ps1` | Run engine/network tests on Windows without downloading Minecraft or Gradle. |
 
-The custom `engineTest` runner currently passes **419 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **15 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-0.1.1.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
+The custom `engineTest` runner currently passes **419 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **15 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-0.1.3.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
 
 <details>
 <summary><strong>Developer checks before publishing</strong></summary>

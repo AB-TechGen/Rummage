@@ -1,4 +1,5 @@
-package dev.rummage.client;
+package dev.rummage.mixin.client;
+import dev.rummage.client.RummageClient;
 import net.minecraft.client.renderer.Lightmap;
 import net.minecraft.client.renderer.state.LightmapRenderState;
 import org.spongepowered.asm.mixin.Mixin;

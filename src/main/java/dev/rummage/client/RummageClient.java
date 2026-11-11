@@ -8,6 +8,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.fabricmc.fabric.api.client.screen.v1.*;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.client.*;
@@ -50,6 +51,7 @@ public final class RummageClient implements ClientModInitializer {
     private long lastDimension;
     private boolean recoveringWorld;
     public MatchRules pendingRules;
+    public String[] pendingConfig;
     public MatchRules savedRules(){try{return MatchRules.decode(preferences.get("rules",MatchRules.DEFAULT.encode()));}catch(IllegalArgumentException e){return MatchRules.DEFAULT;}}
     public void savePreferences(){try{preferences.save();}catch(RuntimeException e){error="Could not save preferences: "+e.getMessage();}}
     @Override public void onInitializeClient() {
@@ -107,33 +109,27 @@ public final class RummageClient implements ClientModInitializer {
                 }
             }
         });
-        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("rummage","status"),(g,delta) -> {
-            Minecraft mc=Minecraft.getInstance(); LobbyConnection c=connection; Snapshot s=c==null?null:c.state;
-            if (s==null || s.phase().equals("LOBBY") || !inMatchWorld() || !preferences.flag("hud",true)) return;
-            float scale=Math.max(0.5f,Math.min(2f,preferences.number("hudScale",100)/100f));
-            scale=Math.min(scale,Math.min((mc.getWindow().getGuiScaledWidth()-16)/234f,(mc.getWindow().getGuiScaledHeight()-16)/70f));
-            g.pose().pushMatrix();g.pose().scale(scale,scale);
-            int x=8,y=8;
-            g.fill(x,y,x+234,y+70,0xDE102024);
-            g.fill(x,y,x+3,y+70,0xFF67E8A5);
-            g.text(mc.font,"RUMMAGE  /  ROUND "+s.round(),x+10,y+8,0xFF67E8A5);
-            if(!s.block().isEmpty())g.item(new net.minecraft.world.item.ItemStack(BuiltInRegistries.BLOCK.getValue(Identifier.parse(s.block()))),x+10,y+21);
-            g.text(mc.font,mc.font.plainSubstrByWidth(displayBlock(s.block()),190),x+30,y+24,0xFFFFFFFF);
-            Snapshot.Player self=s.player(c.id);
-            String status=!c.connected ? c.status : s.phase().equals("FINISHED") ? s.result() : self!=null && !self.alive() ? "Eliminated" : self!=null && self.complete() ? "Block found!" : s.phase()+"  "+s.secondsLeft()+"s";
-            g.text(mc.font,mc.font.plainSubstrByWidth(status,210),x+10,y+40,self!=null&&self.complete()?0xFF67E8A5:s.secondsLeft()<=10?0xFFFF7755:0xFFCFD9D6);
-            g.text(mc.font,"B: lobby / standings",x+10,y+55,0xFF8FA49D);
-            g.pose().popMatrix();
+        net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents.ALLOW_CHAT.register(message->{
+            var c=connection;
+            if(c==null||!c.connected||!inMatchWorld()||!preferences.flag("playerChat",true))return true;
+            c.send("CHAT",message.substring(0,Math.min(240,message.length())));return false;
         });
+        MatchHud hud=new MatchHud(this);
+        HudElementRegistry.addFirst(Identifier.fromNamespaceAndPath("rummage","waiting"),(g,delta)->hud.waiting(g));
+        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("rummage","status"),(g,delta)->hud.render(g));
+        HudElementRegistry.replaceElement(VanillaHudElements.PLAYER_LIST,hud::playerList);
     }
     private void tick(Minecraft mc) {
         while(brightKey.consumeClick()){preferences.put("fullbright",!preferences.flag("fullbright",false));savePreferences();}
         while(hudKey.consumeClick()){preferences.put("hud",!preferences.flag("hud",true));savePreferences();}
         while(playersKey.consumeClick())mc.gui.setScreen(mc.gui.screen() instanceof PlayersScreen?null:new PlayersScreen(this,mc.gui.screen()));
         if(hosting!=null){var reach=hosting.reach();relayStatus=reach.note();invite=reach.code();}
-        while (lobbyKey.consumeClick()) mc.gui.setScreen(mc.gui.screen() instanceof LobbyScreen ? null : new LobbyScreen(this));
+        while (lobbyKey.consumeClick()) { if(mc.gui.screen()==null)mc.gui.setScreen(inMatchWorld()?new MatchScreen(this):new LobbyScreen(this)); }
         LobbyConnection c=connection; Snapshot s=c==null?null:c.state;
         if (s==null) return;
+        String[] pending=pendingConfig;
+        if(pending!=null&&(!s.leader().equals(c.id)||(pending[0].equals(""+s.seed())&&pending[1].equals(""+s.seconds())&&pending[2].equals(""+s.maxRounds()))))pendingConfig=null;
+        if(inMatchWorld()&&s.phase().equals("LOADING")&&mc.gui.hud.isHidden())mc.gui.hud.toggle();
         if(recoveringWorld&&mc.level==null&&mc.gui.screen() instanceof LobbyScreen&&!s.phase().equals("LOBBY")){recoveringWorld=false;createWorld();}
         if(s.phase().equals("LOADING")&&!s.matchId().equals(worldMatch)&&mc.getSingleplayerServer()!=null&&mc.getSingleplayerServer().getWorldData().getLevelName().equals(worldFolder)){mc.disconnect(new LobbyScreen(this),false);return;}
         if (s.phase().equals("LOBBY") && mc.getSingleplayerServer()!=null && mc.getSingleplayerServer().getWorldData().getLevelName().equals(worldFolder)) { mc.disconnect(new LobbyScreen(this),false); return; }
@@ -151,6 +147,8 @@ public final class RummageClient implements ClientModInitializer {
             mc.createWorldOpenFlows().createFreshLevel(worldFolder,settings,new WorldOptions(s.seed(),true,false),WorldPresets::createNormalWorldDimensions,new LobbyScreen(this));
         } catch (RuntimeException e) { worldMatch=""; error="World creation failed: "+e.getMessage(); mc.gui.setScreen(new LobbyScreen(this)); }
     }
+    public String matchKeyName(){return lobbyKey.getTranslatedKeyMessage().getString();}
+    public boolean matchKey(net.minecraft.client.input.KeyEvent event){return lobbyKey.matches(event);}
     public boolean inMatchWorld() { Minecraft mc=Minecraft.getInstance(); return connection!=null && connection.state!=null && !connection.state.phase().equals("LOBBY") && mc.getSingleplayerServer()!=null && mc.getSingleplayerServer().getWorldData().getLevelName().equals(worldFolder); }
     public Snapshot activeState(net.minecraft.server.MinecraftServer server){var c=connection;var s=c==null?null:c.state;return s!=null&&!s.phase().equals("LOBBY")&&s.matchId().equals(worldMatch)&&server.getWorldData().getLevelName().equals(worldFolder)?s:null;}
     public boolean applies(net.minecraft.server.MinecraftServer server){return activeState(server)!=null;}
@@ -163,11 +161,14 @@ public final class RummageClient implements ClientModInitializer {
     }
     public void join(String code,String playerName) { try { leave(); name=playerName;rememberName(); invite=code.strip();connect(invite,false);error=""; } catch (RuntimeException e) { error="Could not join: "+e.getMessage(); } }
     private void rememberName(){preferences.put("name",name);savePreferences();}
-    private void connect(String code,boolean recovery){pendingRules=null;String token=recovery?preferences.get("token",""):"";preferences.put("recoveryInvite",code);savePreferences();connection=new LobbyConnection(code,name,this::message,token,t->{preferences.put("token",t);savePreferences();},preferences.get("relay",""));}
+    private void connect(String code,boolean recovery){pendingRules=null;pendingConfig=null;String token=recovery?preferences.get("token",""):"";preferences.put("recoveryInvite",code);savePreferences();connection=new LobbyConnection(code,name,this::message,token,t->{preferences.put("token",t);savePreferences();},preferences.get("relay",""));}
     public void recover(){try{if(connection!=null&&connection.connected){error="Already connected.";return;}if(connection!=null)connection.close();invite=preferences.get("recoveryInvite","");connect(invite,true);recoveringWorld=true;error="";}catch(RuntimeException e){error="Recovery failed: "+e.getMessage();}}
     public void leave() { if(connection!=null) connection.close(); connection=null; if(hosting!=null)hosting.close();hosting=null;relayStatus="";if(host!=null)try {host.close();}catch(Exception ignored){} host=null; invite=""; messages.clear();preferences.put("token","");preferences.put("recoveryInvite","");savePreferences(); }
     public void checkUpdates(){Thread.ofVirtual().start(()->{String url=preferences.get("updateUrl",""),key=preferences.get("updateKey","");if(url.isBlank()||key.isBlank()){updateStatus="Set an update manifest URL and trusted key in Preferences.";return;}try{updateStatus="Checking updates…";update=Updates.check(url,key);updateStatus=update==null?"You are up to date.":"Verified update available: "+update.version();}catch(Exception e){updateStatus="Update check failed: "+e.getMessage();}});}
     public void downloadUpdate(){var release=update;if(release==null)return;Thread.ofVirtual().start(()->{try{Path jar=Updates.download(release,FabricLoader.getInstance().getConfigDir().resolve("rummage-update"));updateStatus="Verified download: "+jar.getFileName()+". Open update folder to install.";}catch(Exception e){updateStatus="Download failed: "+e.getMessage();}});}
-    public void message(String text) { messages.addLast(text); while(messages.size()>50)messages.pollFirst(); }
+    public void message(String text) {
+        messages.addLast(text);while(messages.size()>50)messages.pollFirst();
+        Minecraft mc=Minecraft.getInstance();mc.execute(()->{if(mc.player!=null&&inMatchWorld()&&preferences.flag("playerChat",true))mc.gui.hud.getChat().addClientSystemMessage(Component.literal(text));});
+    }
     public static String displayBlock(String id) { if(id.isEmpty())return "Waiting for the next block…"; String text=id.replace("minecraft:","").replace('_',' '); return Character.toUpperCase(text.charAt(0))+text.substring(1); }
 }

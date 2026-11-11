@@ -1,11 +1,11 @@
 package dev.rummage.client;
 
-import dev.rummage.net.Snapshot;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+/** Optional persistent standings view; Tab provides the quick in-world view. */
 final class PlayersScreen extends Screen {
     private final RummageClient mod;
     private final Screen parent;
@@ -14,13 +14,12 @@ final class PlayersScreen extends Screen {
     @Override public boolean isPauseScreen(){return false;}
     @Override public void onClose(){minecraft.gui.setScreen(parent);}
     @Override public void extractRenderState(GuiGraphicsExtractor g,int x,int y,float delta){
-        g.fill(0,0,width,height,0xF00D171B);g.centeredText(font,"PLAYERS / STANDINGS",width/2,20,0xFF67E8A5);
-        Snapshot s=mod.connection==null?null:mod.connection.state;int row=48;
-        if(s!=null)for(var p:s.players()){
-            String status=!p.connected()?"away":!p.alive()?"eliminated":p.complete()?"found":p.ready()?"ready":"waiting";
-            g.text(font,font.plainSubstrByWidth((p.id().equals(s.leader())?"* ":"  ")+p.name(),width/2-25),16,row,0xFFFFFFFF);
-            g.text(font,font.plainSubstrByWidth(p.score()+" pts / "+status+" / "+p.ping()+"ms",width/2-16),width/2,row,0xFFBDCEC8);
-            g.text(font,p.dimension().replace("minecraft:",""),20,row+11,0xFF8FA49D);row+=28;
+        var c=mod.connection;var s=c==null?null:c.state;int w=Math.min(420,width-24),left=(width-w)/2;
+        Ui.panel(g,left,10,w,26+(s==null?0:s.players().size()*22));g.centeredText(font,"Player Standings",width/2,18,Ui.GOLD);
+        int row=37;if(s!=null)for(var p:s.players()){
+            Ui.text(g,font,(p.id().equals(s.leader())?"★ ":"")+p.name()+(p.id().equals(c.id)?" (you)":""),left+8,row,w/2-12,Ui.TEXT);
+            Ui.text(g,font,p.score()+" pts · "+Ui.status(s,p)+" · "+p.ping()+"ms",left+w/2,row,w/2-8,p.complete()?Ui.GREEN:Ui.TEXT);
+            Ui.text(g,font,p.dimension().replace("minecraft:",""),left+8,row+10,w-16,Ui.MUTED);row+=22;
         }
         super.extractRenderState(g,x,y,delta);
     }

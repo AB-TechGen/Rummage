@@ -1,4 +1,5 @@
-package dev.rummage.client;
+package dev.rummage.mixin.client;
+import dev.rummage.client.RummageClient;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;

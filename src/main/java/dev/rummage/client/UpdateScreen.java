@@ -17,5 +17,5 @@ final class UpdateScreen extends Screen {
     }
     @Override public boolean isPauseScreen(){return false;}
     @Override public void onClose(){minecraft.gui.setScreen(parent);}
-    @Override public void extractRenderState(GuiGraphicsExtractor g,int x,int y,float d){g.fill(0,0,width,height,0xF00D171B);g.centeredText(font,"SIGNED UPDATES",width/2,20,0xFF67E8A5);g.centeredText(font,font.plainSubstrByWidth(mod.updateStatus,width-20),width/2,150,0xFFFFFFFF);super.extractRenderState(g,x,y,d);}
+    @Override public void extractRenderState(GuiGraphicsExtractor g,int x,int y,float d){Ui.panel(g,width/2-120,8,240,height-16);g.centeredText(font,"SIGNED UPDATES",width/2,20,Ui.GOLD);Ui.wrap(g,font,mod.updateStatus,width/2-110,142,220,Ui.TEXT);super.extractRenderState(g,x,y,d);}
 }

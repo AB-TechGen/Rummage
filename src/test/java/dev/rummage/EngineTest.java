@@ -37,7 +37,7 @@ public final class EngineTest {
         try{Wire.read(new DataInputStream(new ByteArrayInputStream(new byte[]{0,2,0,0})));throw new AssertionError("Oversized frame accepted");}catch(IOException expected){checks++;}
         Snapshot snapshot=Snapshot.decode(Snapshot.encode(m,5004));check(snapshot.players().size()==2&&snapshot.round()==1,"Snapshot serialization");
         network();
-        features(); social(); relay(); relayTls(); recovery(); storageAndUpdates();
+        features(); targetProgression(); social(); relay(); relayTls(); recovery(); storageAndUpdates();
         checks+=dev.rummage.net.ConnectionTest.run();
         System.out.println("PASS: "+checks+" assertions, including real TCP lobby integration.");
     }
@@ -59,6 +59,46 @@ public final class EngineTest {
         try(Synchronizer server=new Synchronizer(0);Socket s=new Socket("127.0.0.1",server.port())){
             s.setSoTimeout(2000);Wire.write(new DataOutputStream(s.getOutputStream()),"HELLO","bad-version",server.secret,"name","");check(Wire.read(new DataInputStream(s.getInputStream()))[0].equals("ERROR"),"Version mismatch rejected");
         }
+    }
+    static void targetProgression(){
+        check(BlockPool.stage(3,30*60_000L)==0,"Crafted targets cannot unlock before round 4");
+        check(BlockPool.stage(4,299_999)==0&&BlockPool.stage(4,300_000)==1,"Crafted targets require five active minutes");
+        check(BlockPool.stage(9,899_999)==1&&BlockPool.stage(9,900_000)==2,"Resource targets require fifteen active minutes");
+        check(BlockPool.stage(16,1_799_999)==2&&BlockPool.stage(16,1_800_000)==3,"Rare targets require thirty active minutes");
+        check(BlockPool.stage(100,60_000)==0,"Rapid easy completions cannot rush advanced targets");
+        List<String> history=new ArrayList<>();String previous="";
+        for(int round=1;round<=12;round++){
+            String target=BlockPool.draw(77,round,previous,Set.of(),history,0);
+            check(!history.contains(target),"Starter targets do not repeat before their pool is exhausted");
+            history.add(target);previous=target;
+        }
+        for(int round=13;round<=25;round++){
+            String target=BlockPool.draw(77,round,previous,Set.of(),history,0);
+            check(!history.subList(history.size()-3,history.size()).contains(target),"Recycled pools avoid the last three targets");
+            history.add(target);previous=target;
+        }
+        Set<String> exclusions=Set.of("minecraft:oak_planks","minecraft:dried_kelp_block","minecraft:bamboo_block","minecraft:moss_block","minecraft:terracotta","minecraft:snow_block");
+        history.clear();previous="";
+        for(int round=1;round<=60;round++){
+            String target=BlockPool.draw(88,round,previous,exclusions,history,round*120_000L);
+            check(!exclusions.contains(target),"Biome exclusions survive every progression tier");
+            check(target.equals(BlockPool.draw(88,round,previous,exclusions,history,round*120_000L)),"History-aware weighted targets are deterministic");
+            history.add(target);previous=target;
+        }
+        // Loading, lookout and intermission must not unlock harder targets.
+        Match rapid=new Match();rapid.join("Rapid");rapid.configure(rapid.leader,31,300,20);
+        rapid.rules=new MatchRules(false,120,"","",400);rapid.start(rapid.leader,0);
+        rapid.worldReport(rapid.leader,rapid.matchId,Set.of(),true,200_000);rapid.ready(rapid.leader,rapid.matchId,31);
+        rapid.tick(200_000);rapid.tick(325_000);Set<String> starter=new HashSet<>(List.of("dirt","grass_block","stone","cobblestone","gravel","sand","oak_planks","crafting_table","furnace","polished_andesite","polished_diorite","polished_granite"));
+        for(int i=0;i<15;i++){
+            check(starter.contains(rapid.target.replace("minecraft:","")),"Only active round time contributes to progression");
+            long completeAt=rapid.deadline-299_999;rapid.claim(rapid.leader,rapid.matchId,rapid.round,rapid.target,completeAt);rapid.tick(completeAt);rapid.tick(rapid.deadline);
+        }
+        // Force all lower-tier blocks out to verify the exact newly unlocked objectives.
+        Set<String> lower=new HashSet<>();for(String t:starter)lower.add("minecraft:"+t);
+        String crafted=BlockPool.draw(5,4,"",lower,List.of(),300_000);
+        check(!Set.of("minecraft:bookshelf","minecraft:iron_block","minecraft:netherrack","minecraft:diamond_block").contains(crafted),"Expensive resource blocks do not enter the crafted tier");
+        rejected(()->BlockPool.draw(5,3,"",lower,List.of(),0));
     }
     static void social()throws Exception{
         Match finished=running(2,2);String originalLeader=finished.leader;

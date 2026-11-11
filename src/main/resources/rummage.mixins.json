@@ -1,1 +1,1 @@
-{"required":true,"package":"dev.rummage.mixin.client","compatibilityLevel":"JAVA_25","client":["PauseMixin","LootRandomMixin","LightmapMixin","FogMixin","FairPlayMixin","GameRulesMixin","BarterMixin"],"injectors":{"defaultRequire":1}}
+{"required":true,"package":"dev.rummage.mixin.client","compatibilityLevel":"JAVA_25","client":["PauseMixin","LootRandomMixin","LightmapMixin","FogMixin","FairPlayMixin","DifficultyMixin","GameRulesMixin","BarterMixin"],"injectors":{"defaultRequire":1}}

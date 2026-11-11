@@ -65,6 +65,8 @@ public final class RummageClient implements ClientModInitializer {
         playersKey=KeyMappingHelper.registerKeyMapping(new KeyMapping("key.rummage.players",InputConstants.KEY_P,category));
         lobbyKey=KeyMappingHelper.registerKeyMapping(new KeyMapping("key.rummage.lobby",InputConstants.KEY_B,KeyMapping.Category.register(Identifier.fromNamespaceAndPath("rummage","main"))));
         ScreenEvents.AFTER_INIT.register((client,screen,w,h) -> {
+            FairPlayControls.apply(screen);
+            ScreenEvents.afterTick(screen).register(FairPlayControls::apply);
             if (screen instanceof TitleScreen) {
                 Screens.getWidgets(screen).add(Button.builder(Component.literal("Rummage"),b -> client.gui.setScreen(new LobbyScreen(this))).bounds(w-114,8,106,20).build());
                 if(client.getSingleplayerServer()==null&&preferences.number("keepWorlds",0)>0)Thread.ofVirtual().start(()->{try{worlds.prune(preferences.number("keepWorlds",0),worldFolder);}catch(Exception e){message("World cleanup skipped: "+e.getMessage());}});
@@ -80,14 +82,19 @@ public final class RummageClient implements ClientModInitializer {
             advancements.tick(server,p,c,s);
             if (spawn==null) {spawn=p.position();lookoutY=spawn.y;for(int x=-16;x<=16;x+=16)for(int z=-16;z<=16;z+=16)lookoutY=Math.max(lookoutY,p.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,(int)spawn.x+x,(int)spawn.z+z));lookoutY+=20;}
             if(!worldMarked){try{worlds.mark(worldFolder);worldMarked=true;}catch(Exception e){message("Could not mark match world: "+e.getMessage());}}
-            {
-                server.getWorldData().setAllowCommands(false);server.setDifficulty(Difficulty.NORMAL,true);server.setDifficultyLocked(true);
-                if(server instanceof net.minecraft.client.server.IntegratedServer integrated){integrated.setWorldAllowCommands(false);if(integrated.isPublished())integrated.unpublishServer();}
+            // Updating permissions can also reset the game mode; never do it on every tick.
+            if(server.getWorldData().isAllowCommands()){
+                if(server instanceof net.minecraft.client.server.IntegratedServer integrated)integrated.setWorldAllowCommands(false);
+                else server.getWorldData().setAllowCommands(false);
             }
+            if(server.getWorldData().getDifficulty()==Difficulty.PEACEFUL)server.setDifficulty(Difficulty.EASY,true);
+            if(server.getWorldData().isDifficultyLocked())server.setDifficultyLocked(false);
+            if(server instanceof net.minecraft.client.server.IntegratedServer integrated&&integrated.isPublished())integrated.unpublishServer();
             if(Snapshot.now()-lastDimension>2000){c.send("DIMENSION",p.level().dimension().identifier().toString());lastDimension=Snapshot.now();}
             if (s.phase().equals("LOADING") || s.phase().equals("COUNTDOWN")) {
-                p.setGameMode(GameType.SPECTATOR);
-                p.teleportTo(spawn.x,s.phase().equals("COUNTDOWN")&&s.secondsLeft()>5?lookoutY:spawn.y,spawn.z);
+                if(p.gameMode()!=GameType.SPECTATOR)p.setGameMode(GameType.SPECTATOR);
+                Vec3 lookout=new Vec3(spawn.x,s.phase().equals("COUNTDOWN")&&s.secondsLeft()>5?lookoutY:spawn.y,spawn.z);
+                if(p.distanceToSqr(lookout)>0.0001)p.teleportTo(lookout.x,lookout.y,lookout.z);
                 p.setDeltaMovement(Vec3.ZERO);
                 if (c.connected && s.phase().equals("LOADING")) {
                     if(c.id.equals(s.leader())&&!reportedWorld.equals(s.matchId())){
@@ -99,7 +106,8 @@ public final class RummageClient implements ClientModInitializer {
                 }
             } else {
                 Snapshot.Player self=s.player(c.id);
-                p.setGameMode(self!=null && self.alive() && !s.phase().equals("FINISHED") ? GameType.SURVIVAL : GameType.SPECTATOR);
+                GameType wanted=self!=null&&self.alive()&&!s.phase().equals("FINISHED")?GameType.SURVIVAL:GameType.SPECTATOR;
+                if(p.gameMode()!=wanted)p.setGameMode(wanted);
                 if (s.phase().equals("ROUND") && self!=null && self.alive() && !self.complete() && p.onGround() && Snapshot.now()-lastClaim>250) {
                     String block=BuiltInRegistries.BLOCK.getKey(p.level().getBlockState(BlockPos.containing(p.getX(),p.getY()-0.05,p.getZ())).getBlock()).toString();
                     if (block.equals(s.block())) { c.send("CLAIM",s.matchId(),""+s.round(),block); lastClaim=Snapshot.now(); }
@@ -149,7 +157,7 @@ public final class RummageClient implements ClientModInitializer {
         worldMatch=s.matchId(); worldFolder="Rummage "+s.matchId(); spawn=null; announcedReady=false;
         worldMarked=false;preferences.put("worldMatch",worldMatch);preferences.put("worldFolder",worldFolder);savePreferences();
         try {
-            LevelSettings settings=new LevelSettings(worldFolder,GameType.SURVIVAL,new LevelSettings.DifficultySettings(Difficulty.NORMAL,false,false),false,WorldDataConfiguration.DEFAULT);
+            LevelSettings settings=new LevelSettings(worldFolder,GameType.SURVIVAL,new LevelSettings.DifficultySettings(Difficulty.EASY,false,false),false,WorldDataConfiguration.DEFAULT);
             mc.createWorldOpenFlows().createFreshLevel(worldFolder,settings,new WorldOptions(s.seed(),true,false),WorldPresets::createNormalWorldDimensions,new LobbyScreen(this));
         } catch (RuntimeException e) { worldMatch=""; error="World creation failed: "+e.getMessage(); mc.gui.setScreen(new LobbyScreen(this)); }
     }

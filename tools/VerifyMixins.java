@@ -21,6 +21,15 @@ class VerifyMixins {
                         for(var field:mixin.fields)for(var annotation:annotations(field.visibleAnnotations,field.invisibleAnnotations))if(annotation.desc.endsWith("/Shadow;")){
                             if(target.fields.stream().noneMatch(f->f.name.equals(field.name)&&f.desc.equals(field.desc)))throw new AssertionError("Shadow mismatch "+name+"."+field.name);checks++;
                         }
+                        for(var method:mixin.methods)for(var annotation:annotations(method.visibleAnnotations,method.invisibleAnnotations))if(annotation.desc.equals("Lorg/spongepowered/asm/mixin/injection/ModifyVariable;")){
+                            for(Object selector:(List<?>)value(annotation,"method")){
+                                String selectorText=selector.toString();int bracket=selectorText.indexOf('(');String methodName=bracket<0?selectorText:selectorText.substring(0,bracket);
+                                var matches=target.methods.stream().filter(m->m.name.equals(methodName)&&(bracket<0||m.desc.equals(selectorText.substring(bracket)))).toList();
+                                Type[] handler=Type.getArgumentTypes(method.desc);Type replacement=Type.getReturnType(method.desc);
+                                if(matches.isEmpty()||handler.length!=1||!handler[0].equals(replacement)||matches.stream().anyMatch(m->Arrays.stream(Type.getArgumentTypes(m.desc)).noneMatch(replacement::equals)))throw new AssertionError("Argument modifier mismatch "+name+"."+selectorText);
+                                checks++;
+                            }
+                        }
                         for(var method:mixin.methods)for(var annotation:annotations(method.visibleAnnotations,method.invisibleAnnotations))if(annotation.desc.equals("Lorg/spongepowered/asm/mixin/injection/Inject;")){
                             for(Object selector:(List<?>)value(annotation,"method")){
                                 String s=selector.toString();int bracket=s.indexOf('(');String methodName=bracket<0?s:s.substring(0,bracket),descriptor=bracket<0?null:s.substring(bracket);

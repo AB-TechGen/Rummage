@@ -5,7 +5,7 @@ import java.util.*;
 /** Single authoritative state machine, synchronized by its transport. Times are monotonic milliseconds. */
 public final class Match {
     public enum Phase { LOBBY, LOADING, COUNTDOWN, ROUND, INTERMISSION, FINISHED }
-    public static final String VERSION = "0.2.0";
+    public static final String VERSION = "0.2.1";
     public static final long RESULT_MS = 8000;
     private boolean returnScheduled;
     public static final long RECONNECT_MS = 300_000;
@@ -24,6 +24,8 @@ public final class Match {
     public long seed, deadline;
     public int round, roundSeconds = 300, maxRounds = 20;
     private boolean solo;
+    private long activeMillis, roundStartedAt;
+    private final List<String> targetHistory=new ArrayList<>();
     public MatchRules rules = MatchRules.DEFAULT;
     public final Set<String> excluded = new HashSet<>(), drawVotes = new HashSet<>();
     public long drawDeadline;
@@ -88,6 +90,7 @@ public final class Match {
         begin(now);
     }
     private void begin(long now) {
+        activeMillis=0;roundStartedAt=0;targetHistory.clear();
         matchId = UUID.randomUUID().toString();
         returnScheduled=false;
         phase = Phase.LOADING; deadline = now + 300_000; round = 0; target = ""; result = "";
@@ -155,8 +158,9 @@ public final class Match {
             else if (players.values().stream().filter(p -> p.alive).allMatch(p -> p.complete)) endRound(now);
         } else if (phase == Phase.INTERMISSION && now >= deadline) nextRound(now);
     }
-    private void nextRound(long now) { round++; target = BlockPool.draw(seed, round, target, excluded); players.values().forEach(p -> p.complete = false); phase = Phase.ROUND; int seconds=rules.suddenDeath() && !solo && round>maxRounds ? Math.max(10,roundSeconds/(1+round-maxRounds)) : roundSeconds; deadline = now + seconds * 1000L; }
+    private void nextRound(long now) { round++; target = BlockPool.draw(seed, round, target, excluded, targetHistory, activeMillis); targetHistory.add(target); roundStartedAt=now; players.values().forEach(p -> p.complete = false); phase = Phase.ROUND; int seconds=rules.suddenDeath() && !solo && round>maxRounds ? Math.max(10,roundSeconds/(1+round-maxRounds)) : roundSeconds; deadline = now + seconds * 1000L; }
     private void endRound(long now) {
+        activeMillis+=Math.max(0,Math.min(now,deadline)-roundStartedAt);
         if (checkWinner()) return;
         if (round >= maxRounds && (!rules.suddenDeath() || solo)) { finishSurvivors("Completed all rounds: "); return; }
         phase = Phase.INTERMISSION; deadline = now + 5000;

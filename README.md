@@ -6,7 +6,7 @@ Rummage is a Minecraft Fabric mod for **1–8 players**. Everyone explores their
 
 | Current version | Minecraft | Java | Players |
 | --- | --- | --- | --- |
-| **0.2.0** | **26.3** | **25** | **1–8**, including solo practice |
+| **0.2.1** | **26.3** | **25** | **1–8**, including solo practice |
 
 [Install](#install) · [Play](#play) · [Controls](#controls) · [Settings](#settings) · [Play with friends](#play-with-friends) · [Recovery](#disconnects-and-recovery) · [Troubleshooting](#troubleshooting)
 
@@ -18,7 +18,7 @@ Rummage is a Minecraft Fabric mod for **1–8 players**. Everyone explores their
 | Java | **25** |
 | Fabric Loader | **0.19.5 or newer** |
 | Fabric API | **0.165.0+26.3** |
-| Rummage | **rummage-0.2.0.jar**, the same version for every player |
+| Rummage | **rummage-0.2.1.jar**, the same version for every player |
 
 1. Install Fabric Loader for Minecraft 26.3 and select that profile in your launcher.
 2. Get the Rummage jar from a release, a successful GitHub **Actions → Build → Artifacts → rummage** download, or build it using the commands below. Extract the artifact ZIP if using GitHub Actions.
@@ -71,7 +71,16 @@ The HUD turns green and shows **Block found!** when your completion is confirmed
 
 The compact target HUD sits at the top right. Loading covers the world until everyone is ready, the final countdown appears in the centre, and results appear as a banner. **B** opens match actions over the world; **Lobby / Chat** opens the social lobby. Forfeit requires a second press within four seconds. When the game ends, everyone spectates during the eight-second result countdown, then returns to the lobby automatically—even if the original leader disconnected.
 
-Inventory and world progress carry between rounds. A new match creates fresh worlds. Common targets come first; more crafting and mining targets enter the pool at **round 4**, with Nether and rarer targets from **round 9**. Consecutive targets never repeat.
+Inventory and world progress carry between rounds. A new match creates fresh worlds. Target progression now requires both the round number and time actually spent in active rounds:
+
+| Tier | First eligible | Examples |
+| --- | --- | --- |
+| Starter | Round 1 | Dirt, stone, gravel, planks, crafting table, furnace, polished stone variants |
+| Crafted | Round 4 **and 5 active minutes** | Glass, stone bricks, wool, sandstone, biome-dependent blocks |
+| Resources / Nether access | Round 9 **and 15 active minutes** | Bookshelf, metal/resource blocks, obsidian, netherrack |
+| Rare / further processing | Round 16 **and 30 active minutes** | Nether bricks, quartz, glowstone, amethyst, diamond block |
+
+Unused eligible targets are preferred. Once all eligible targets have appeared, the last three are avoided when alternatives exist. Later stages put more weight on harder tiers, rather than drawing uniformly from an ever-growing list. Loading, lookout and intermission do not count toward progression; time in menus during an active round still counts. See [target-selection details](docs/TARGET_SELECTION.md).
 
 **The clock keeps running while menus are open or a player is disconnected.** Waiting and eliminated players are spectators.
 
@@ -114,7 +123,7 @@ Personal controls stay separate: **H** toggles the target HUD and **G** toggles 
 
 **Seed filtering:** the leader checks a generated world. Random seeds retry up to **eight worlds**; a typed seed that fails is rejected without replacement. These attempts load real worlds and can take time. Blank filters accept any seed. Biomes are sampled on a grid, so the checks cannot guarantee every target block is nearby or reachable.
 
-Biome-aware selection covers **oak planks, dried kelp, bamboo, moss, terracotta and snow blocks**. Bamboo, moss, terracotta and snow targets enter from round 4.
+Biome-aware selection covers **oak planks, dried kelp, bamboo, moss, terracotta and snow blocks**. Bamboo, moss, terracotta and snow targets enter with the crafted tier (round 4 and five active minutes).
 
 ### Optional modes
 
@@ -145,7 +154,7 @@ New announced advancements are shared once with the lobby, using the player's co
 
 ### Always-on gameplay rules
 
-Every match uses biome-aware targets, standardized supported loot RNG, reduced ordinary Nether fog, guaranteed pearl trades and fair-play restrictions. Difficulty stays Normal, and commands, LAN publishing and rule edits are restricted. Fullbright is always available as a personal toggle. No starting kit is given.
+Every match uses biome-aware targets, standardized supported loot RNG, reduced ordinary Nether fog, guaranteed pearl trades and fair-play restrictions. New worlds start on Easy. Easy, Normal and Hard can be selected in World Options; Peaceful is silently replaced with Easy before it can remove hostile mobs. Commands, LAN publishing, game-mode changes and rule-edit buttons are disabled during matches. Fullbright is always available as a personal toggle. No starting kit is given.
 
 ### What standardized loot RNG covers
 
@@ -201,7 +210,7 @@ The host's Minecraft process owns the synchronizer. Closing it ends the lobby ev
 Needs **Java 25**, but no Minecraft installation or Fabric dependencies at runtime:
 
 ```sh
-java -jar build/libs/rummage-0.2.0.jar
+java -jar build/libs/rummage-0.2.1.jar
 ```
 
 The terminal prepares the connection automatically and prints its invite. The **first player to join becomes leader**; everyone joins through Rummage's lobby screen.
@@ -278,7 +287,7 @@ The old Updates screen configured an optional signed update feed. No production 
 | Problem | Try this |
 | --- | --- |
 | Rummage button is missing | Check the Fabric profile, Minecraft version, Fabric API and the selected instance's `mods` folder. |
-| Wrong invite or version | Make sure everyone has **0.2.0**, remove duplicate jars, and copy a fresh invite. |
+| Wrong invite or version | Make sure everyone has **0.2.1**, remove duplicate jars, and copy a fresh invite. |
 | Friends cannot join a direct invite | Check the displayed port, host firewall and address reachability. The fallback note explains whether only LAN access is available. |
 | Short invite will not connect | Wait if the host is recovering its connection. If the code expired, create a new lobby. Check any advanced Worker override matches on all clients. |
 | Hosting is preparing an invite | Let the automatic Worker/UPnP checks finish. An occupied TCP 25570 is handled automatically. |
@@ -300,12 +309,12 @@ Requires **JDK 25**. The wrapper downloads Gradle **9.7.1** and dependencies on 
 
 | Output / command | Purpose |
 | --- | --- |
-| `build/libs/rummage-0.2.0.jar` | Installable client mod, standalone synchronizer and relay. |
-| `build/libs/rummage-0.2.0-sources.jar` | Source archive; do not install as the mod. |
+| `build/libs/rummage-0.2.1.jar` | Installable client mod, standalone synchronizer and relay. |
+| `build/libs/rummage-0.2.1-sources.jar` | Source archive; do not install as the mod. |
 | `./gradlew test` | Run the custom engine/integration suite through the standard test task. |
 | `powershell -ExecutionPolicy Bypass -File tools/test.ps1` | Run engine/network tests on Windows without downloading Minecraft or Gradle. |
 
-The custom `engineTest` runner currently passes **446 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **17 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-0.2.0.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
+The custom `engineTest` runner currently passes **613 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **19 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-0.2.1.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
 
 <details>
 <summary><strong>Developer checks before publishing</strong></summary>

@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.*;
 @Mixin(IntegratedServer.class)
 public class FairPlayMixin {
-    private boolean rummage$locked(){var m=RummageClient.INSTANCE;var s=m==null?null:m.activeState((MinecraftServer)(Object)this);return s!=null&&s.rules().fairPlay();}
+    private boolean rummage$locked(){var m=RummageClient.INSTANCE;var s=m==null?null:m.activeState((MinecraftServer)(Object)this);return s!=null;}
     @Inject(method={"publishServer(Lnet/minecraft/server/MinecraftServer$MultiplayerScope;ZI)Z","publishServer(Lnet/minecraft/server/MinecraftServer$MultiplayerScope;I)Z"},at=@At("HEAD"),cancellable=true)
     private void rummage$noLan(CallbackInfoReturnable<Boolean> cir){if(rummage$locked())cir.setReturnValue(false);}
     @Inject(method="setWorldAllowCommands",at=@At("HEAD"),cancellable=true)

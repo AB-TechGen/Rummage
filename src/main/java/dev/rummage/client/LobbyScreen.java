@@ -27,16 +27,17 @@ public final class LobbyScreen extends Screen {
             invite=field("Invite code",cx-w/2,119,w-60,draftInvite,512);invite.setResponder(v->draftInvite=v);
             button("Join",cx+w/2-56,118,56,this::join);
             button("Recover Session",cx-w/2,144,w,mod::recover).active=!mod.preferences.get("token","").isBlank();
-            int small=(w-8)/3;
-            button("Settings",cx-w/2,height-52,small,()->minecraft.gui.setScreen(new SettingsScreen(mod,this)));
-            button("Worlds",cx-w/2+small+4,height-52,small,()->minecraft.gui.setScreen(new WorldsScreen(mod,this)));
-            button("Updates",cx-w/2+2*(small+4),height-52,w-2*(small+4),()->minecraft.gui.setScreen(new UpdateScreen(mod,this)));
+            button("Old Worlds",cx-w/2,height-52,w,()->minecraft.gui.setScreen(new WorldsScreen(mod,this)));
             button("Back",cx-w/2,height-28,w,this::onClose);
         }else{
             side=Math.min(210,(width-24)/2);
             button(showCode?"Hide":"Show",8,43,side/2-2,()->{showCode=!showCode;rebuildWidgets();});
             copy=button("Copy",10+side/2,43,side/2-2,()->minecraft.keyboardHandler.setClipboard(mod.invite));
-            button(s.leader().equals(mod.connection.id)&&s.phase().equals("LOBBY")?"Edit Settings":"View Settings",width-8-side,137,side,()->minecraft.gui.setScreen(new SettingsScreen(mod,this)));
+            if(s.leader().equals(mod.connection.id)&&s.phase().equals("LOBBY"))button("Edit Match Settings",width-8-side,119,side,()->minecraft.gui.setScreen(new SettingsScreen(mod,this)));
+            var chatToggle=button(chatLabel(),width-8-side,145,side,()->{mod.preferences.put("playerChat",!mod.preferences.flag("playerChat",true));mod.savePreferences();rebuildWidgets();});
+            chatToggle.setTooltip(Tooltip.create(Component.literal("On: world chat goes to the lobby and lobby messages appear in world. Off: lobby chat is still available here.")));
+            var keep=button(keepLabel(),width-8-side,171,side,()->{int current=mod.preferences.number("keepWorlds",0);int[] choices={0,5,10,20,50,100,1000};int next=0;for(int choice:choices)if(choice>current){next=choice;break;}mod.preferences.put("keepWorlds",next);mod.savePreferences();rebuildWidgets();});
+            keep.setTooltip(Tooltip.create(Component.literal("Cycle how many newest unprotected match worlds to keep. Keep all disables cleanup. Ordinary saves and protected worlds are never removed.")));
             button("Leave Lobby",width-8-side,height-28,side/2-2,()->{mod.leave();rebuildWidgets();});
             start=button(s.phase().equals("LOBBY")?"Start":"Match",width-6-side/2,height-28,side/2-2,()->{if(s.phase().equals("LOBBY"))startMatch();else minecraft.gui.setScreen(new MatchScreen(mod));});
             int chatW=Math.max(80,width-side-28);
@@ -44,6 +45,8 @@ public final class LobbyScreen extends Screen {
         }
         tick();
     }
+    private String chatLabel(){return "Player chat: "+(mod.preferences.flag("playerChat",true)?"on":"off");}
+    private String keepLabel(){int keep=mod.preferences.number("keepWorlds",0);return "Old worlds: "+(keep<=0?"keep all":"keep "+keep);}
     private void join(){if(invite.getValue().isBlank()){mod.error="Paste an invite code first.";return;}mod.join(invite.getValue(),name.getValue());}
     private void startMatch(){
         var c=mod.connection;if(c==null||c.state==null||!c.connected)return;
@@ -62,8 +65,8 @@ public final class LobbyScreen extends Screen {
             Ui.panel(g,8,8,side,62+s.players().size()*13);g.text(font,"Lobby ("+s.players().size()+"/8)",13,13,Ui.GOLD);
             String code=mod.invite.isBlank()?"Preparing invite…":showCode?mod.invite:"XXXX-XXXX";Ui.text(g,font,code,13,29,side-10,Ui.TEXT);
             int y=72;for(var p:s.players()){Ui.text(g,font,(p.id().equals(s.leader())?"★ ":"")+p.name()+(p.id().equals(mod.connection.id)?" (you)":"")+(!p.connected()?" (away)":""),13,y,side-10,p.connected()?Ui.TEXT:Ui.MUTED);y+=13;}
-            int x=width-8-side;Ui.panel(g,x,8,side,125);g.text(font,"Match Settings",x+5,13,Ui.GOLD);
-            String[] lines={s.seconds()+" seconds per round",s.maxRounds()+" rounds"+(s.rules().suddenDeath()?" + sudden death":""),"Lookout: "+s.rules().lookoutSeconds()+"s","Targets: "+(s.rules().biomeTargets()?"biome-aware":"all"),"Race preset: "+(s.rules().race()?"on":"off"),"Loot RNG: "+(s.rules().standardDrops()?"shared":"vanilla"),s.leader().equals(mod.connection.id)?"You are the leader.":"The leader chooses the rules."};
+            int x=width-8-side;Ui.panel(g,x,8,side,107);g.text(font,"Match Settings",x+5,13,Ui.GOLD);
+            String[] lines={s.seconds()+" seconds per round",s.maxRounds()+" rounds"+(s.rules().suddenDeath()?" + sudden death":""),"Lookout: "+s.rules().lookoutSeconds()+"s","Biome: "+FilterScreen.label(s.rules().biomeFilter()),"Structure: "+FilterScreen.label(s.rules().structureFilter()),s.leader().equals(mod.connection.id)?"You are the leader.":"The leader chooses the rules."};
             y=29;for(String line:lines){Ui.text(g,font,line,x+5,y,side-10,Ui.TEXT);y+=14;}
             int bottom=height-48,chatTop=Math.max(78+s.players().size()*13,164),chatW=Math.max(80,width-side-28);String[] messages=mod.messages.toArray(String[]::new);int count=Math.max(0,(bottom-chatTop)/11);for(int i=Math.max(0,messages.length-count);i<messages.length;i++){Ui.text(g,font,messages[i],10,chatTop,chatW,Ui.TEXT);chatTop+=11;}
             String status=!mod.error.isBlank()?mod.error:!mod.connection.connected?mod.connection.status:!mod.relayStatus.isBlank()?mod.relayStatus:s.phase().equals("LOBBY")?"Start when everyone is here.":"Match in progress — open Match to return.";

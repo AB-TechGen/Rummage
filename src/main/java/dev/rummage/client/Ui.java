@@ -6,6 +6,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 
 final class Ui {
+    static final int BUTTON_WIDTH=120;
     static final int PANEL=0xD0101014,TEXT=0xFFDDDDDD,MUTED=0xFFAAAAAA,GOLD=0xFFFFD54F,GREEN=0xFF66BB6A;
     static void panel(GuiGraphicsExtractor g,int x,int y,int w,int h){g.fill(x,y,x+w,y+h,PANEL);}
     static void text(GuiGraphicsExtractor g,Font f,String s,int x,int y,int w,int color){g.text(f,f.plainSubstrByWidth(s,Math.max(0,w)),x,y,color);}

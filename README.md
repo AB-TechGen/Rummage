@@ -6,7 +6,7 @@ Rummage is a Minecraft Fabric mod for **1–8 players**. Everyone explores their
 
 | Current version | Minecraft | Java | Players |
 | --- | --- | --- | --- |
-| **0.1.3** | **26.3** | **25** | **1–8**, including solo practice |
+| **0.1.6** | **26.3** | **25** | **1–8**, including solo practice |
 
 [Install](#install) · [Play](#play) · [Controls](#controls) · [Settings](#settings) · [Play with friends](#play-with-friends) · [Recovery](#disconnects-and-recovery) · [Troubleshooting](#troubleshooting)
 
@@ -18,7 +18,7 @@ Rummage is a Minecraft Fabric mod for **1–8 players**. Everyone explores their
 | Java | **25** |
 | Fabric Loader | **0.19.5 or newer** |
 | Fabric API | **0.165.0+26.3** |
-| Rummage | **rummage-0.1.3.jar**, the same version for every player |
+| Rummage | **rummage-0.1.6.jar**, the same version for every player |
 
 1. Install Fabric Loader for Minecraft 26.3 and select that profile in your launcher.
 2. Get the Rummage jar from a release, a successful GitHub **Actions → Build → Artifacts → rummage** download, or build it using the commands below. Extract the artifact ZIP if using GitHub Actions.
@@ -40,7 +40,7 @@ Display names identify players inside a lobby. Rummage does not ask for Microsof
 | --- | --- | --- |
 | **1. Open** | Title screen → **Rummage**; enter a display name. | Open Rummage and enter a display name. |
 | **2. Connect** | Press **Create lobby**, wait for the connection note, then **Copy invite**. Setup happens automatically. | Paste the invite and press **Join lobby**. |
-| **3. Configure** | Set seed, seconds and rounds. Open **Edit Settings** for optional modes, then save. | Check the player list and agreed rules. |
+| **3. Configure** | Open **Edit Match Settings**, choose the match and world options, then save. | Check the player list and agreed rules. |
 | **4. Start** | Press **Start match** and keep the lobby screen open. | Keep the lobby screen open so your match world can load. |
 | **5. Find** | Stand on the displayed target block before the timer reaches zero. | The same target and deadline apply to everyone. |
 | **6. Play again** | After the result, press **Return to lobby**, then start another match. | Your client saves and leaves the world when the leader returns to the lobby. |
@@ -95,7 +95,9 @@ Draw votes last **30 seconds** and need every connected surviving player's agree
 
 ## Settings
 
-Open **Settings** before joining, or **Edit Settings / View Settings** inside a lobby. Choose **Match**, **World**, **Display** or **Updates**, then **Save Settings**. Longer tabs use Previous / Next when needed to fit the window. Hover controls for explanations. Only the leader can change match rules, and those rules lock when a match starts. Local display preferences remain editable.
+Only the **leader** can open **Edit Match Settings** in a connected, pre-game lobby. **Match** contains round time, round limit, sudden death and lookout; **World** contains the seed, optional biome/structure filters and search radius. Changes apply with **Save Settings** and lock when the match starts.
+
+Personal controls stay separate: **H** toggles the target HUD and **G** toggles fullbright (both rebindable in Minecraft Controls). The **B** match panel contains the HUD size slider. **Player chat** and **Old worlds** are local controls on the lobby itself.
 
 ### Match and world rules
 
@@ -104,13 +106,8 @@ Open **Settings** before joining, or **Edit Settings / View Settings** inside a 
 | Seed | Random | Leave blank for a new random seed, or enter a numeric seed to reuse it. |
 | Seconds | **300** | **30–1800** seconds per ordinary round. |
 | Rounds | **20** | **1–100** rounds before shared victory or sudden death. |
-| Biome-aware targets | **On** | Exclude biome-dependent targets when their associated biomes are not detected near spawn. |
 | Sudden death | **Off** | Continue past the cap with shorter rounds until a winner or draw. |
 | Lookout seconds | **0** | **0–120** seconds of aerial preview before the five-second ground countdown. |
-| Standard loot RNG | **On** | Use saved, world-seeded random sequences for supported drops and bartering. |
-| Race preset | **Off** | Give starting supplies, reduce ordinary Nether fog and guarantee early pearl trades. |
-| Allow fullbright | **On** | Allow each player to toggle brighter match-world lighting with **G**. |
-| Fair-play controls | **On** | Keep Normal difficulty and restrict commands, LAN publishing, game-mode changes and rule edits. |
 | Required biome | Any | Choose a named biome, or enter a custom ID. |
 | Required structure | Any | Choose a named structure, or enter a custom ID. |
 | Search radius | **400** blocks | **100–2000** blocks around spawn for biome checks and requested filters. |
@@ -124,25 +121,27 @@ Biome-aware selection covers **oak planks, dried kelp, bamboo, moss, terracotta 
 | Mode | What changes |
 | --- | --- |
 | **Sudden death** | With multiple survivors at the cap, extra rounds last `base seconds / (1 + extra rounds)`, with a **10-second minimum**. For a 300-second base, the first extra round is 150 seconds, then 100, then 75. Everyone failing still draws. Solo practice ends at the normal cap. |
-| **Race preset** | At the first active round, each player gets **one lava bucket, one water bucket, flint and steel, and 16 bread**. Ordinary Nether fog is reduced; fluid, blindness and darkness fog are preserved. Barters **36, 72, 108 and 144** each yield **3 pearls**, guaranteeing at least four pearl trades by 144 ingots. Terrain and portal placement remain vanilla. |
-| **Fullbright** | Press **G** to toggle the lighting effect in a match world. It starts off locally and requires **Allow fullbright** to be on. No potion effect is added. |
+| **Always-on gameplay** | Ordinary Nether fog is reduced; fluid, blindness and darkness fog remain. Barters **36, 72, 108 and 144** each yield **3 pearls**. No starting supplies are given. Terrain and portal placement remain vanilla. |
+| **Fullbright** | Press **G** to toggle the lighting effect in a match world. It starts off locally and is always available in match worlds. No potion effect is added. |
 | **Lookout** | A fixed spectator view **20 blocks above the highest sampled terrain near spawn**. Everyone returns to the ground for the last five seconds. Finding blocks starts counting only when the round begins. |
 
 ### Local preferences
 
 | Setting | Default | What to enter |
 | --- | --- | --- |
-| Show HUD | **On** | Toggle here or with **H**. |
+| Show HUD | **On** | Toggle with **H**, or rebind it in Minecraft Controls. |
 | Player chat in world | **On** | Relay world chat to the lobby and show lobby messages while playing. |
-| HUD scale (%) | **100** | **50–200**; automatically clamped to fit the screen. |
-| Fullbright enabled | **Off** | Your local choice, subject to the leader's rule. |
-| Keep worlds | **0 — keep all** | **1–1000** to enable retention and keep that many newest eligible worlds. |
-| Update manifest URL | Blank | An HTTPS update-feed address supplied by the release maintainer. |
-| Trusted public key | Blank | The maintainer's trusted Ed25519 public key. |
+| HUD scale (%) | **100** | **50–200** in the **B** match panel; automatically clamped to fit the screen. |
+| Fullbright enabled | **Off** | Your local choice, available in every match. |
+| Keep worlds | **0 — keep all** | Cycle the **Old worlds** lobby button to keep a limited number of newest eligible worlds. |
 
 Names, match settings, display choices and recovery details are saved in `config/rummage.properties`. That file contains private reconnect credentials; keep it private.
 
-### What “standard loot RNG” covers
+### Always-on gameplay rules
+
+Every match uses biome-aware targets, standardized supported loot RNG, reduced ordinary Nether fog, guaranteed pearl trades and fair-play restrictions. Difficulty stays Normal, and commands, LAN publishing and rule edits are restricted. Fullbright is always available as a personal toggle. No starting kit is given.
+
+### What standardized loot RNG covers
 
 | Shared sequences | Still dependent on other factors |
 | --- | --- |
@@ -196,7 +195,7 @@ The host's Minecraft process owns the synchronizer. Closing it ends the lobby ev
 Needs **Java 25**, but no Minecraft installation or Fabric dependencies at runtime:
 
 ```sh
-java -jar build/libs/rummage-0.1.3.jar
+java -jar build/libs/rummage-0.1.6.jar
 ```
 
 The terminal prepares the connection automatically and prints its invite. The **first player to join becomes leader**; everyone joins through Rummage's lobby screen.
@@ -264,58 +263,25 @@ Cleanup only considers **marked Rummage worlds**. Ordinary saves, unmarked world
 
 ## Updates
 
-To update manually, close Minecraft, remove the older Rummage jar from `mods`, put the new jar there, and restart. Everyone in a lobby needs the same mod version.
+Updates are manual: close Minecraft, replace the old Rummage jar in the instance's `mods` folder with the new release, then restart. Everyone in a lobby needs the same version.
 
-For signed updates, obtain the **HTTPS manifest URL** and **trusted public key** from the release maintainer, then enter them under **Settings → Updates**.
-
-| Step | Action |
-| --- | --- |
-| **1. Check** | Open **Updates → Check for updates**. Configured clients also check on startup. |
-| **2. Download** | Choose **Download verified update**. The signature and downloaded file hash must match. |
-| **3. Schedule** | Choose **Install on next game exit**. |
-| **4. Restart** | Save, quit Minecraft, then start it again. |
-
-Automatic installation requires a running Rummage jar inside a folder named `mods`. The installer waits for Minecraft to exit, rechecks the download, and keeps a rollback copy at `config/rummage-update/previous.jar.backup`. Downloaded jars and `install.log` are in the same update directory. Development runs can install the verified download manually.
-
-**No production update feed or signing key is preconfigured.** Missing configuration or a failed check leaves gameplay available.
-
-<details>
-<summary><strong>Maintainers: create and publish signed releases</strong></summary>
-
-Generate an Ed25519 private key **outside the repository**, once:
-
-```sh
-java tools/SignRelease.java generate /secure/rummage-release-key.pk8
-```
-
-The command refuses to overwrite an existing key and prints its public key. Back up the private key and keep it private. Give users the public key through a trusted channel.
-
-After building a new version, sign its exact jar bytes and intended HTTPS download URL. This example is for a future **0.1.4** release:
-
-```sh
-java tools/SignRelease.java sign /secure/rummage-release-key.pk8 0.1.4 https://example.com/releases/rummage-0.1.4.jar build/libs/rummage-0.1.4.jar build/update.properties
-```
-
-Publish the jar and manifest at reachable HTTPS URLs, such as release assets, and distribute the manifest URL. Clients verify the version, URL and SHA-256 together using the pinned public key; the downloaded manifest cannot supply its own trusted key.
-
-</details>
+The old Updates screen configured an optional signed update feed. No production feed or trusted signing key was bundled, so that screen and startup update checks have been removed. Existing update preferences are ignored. Maintainer signing and verification utilities remain in the repository for future use.
 
 ## Troubleshooting
 
 | Problem | Try this |
 | --- | --- |
 | Rummage button is missing | Check the Fabric profile, Minecraft version, Fabric API and the selected instance's `mods` folder. |
-| Wrong invite or version | Make sure everyone has **0.1.3**, remove duplicate jars, and copy a fresh invite. |
+| Wrong invite or version | Make sure everyone has **0.1.6**, remove duplicate jars, and copy a fresh invite. |
 | Friends cannot join a direct invite | Check the displayed port, host firewall and address reachability. The fallback note explains whether only LAN access is available. |
 | Short invite will not connect | Wait if the host is recovering its connection. If the code expired, create a new lobby. Check any advanced Worker override matches on all clients. |
 | Hosting is preparing an invite | Let the automatic Worker/UPnP checks finish. An occupied TCP 25570 is handled automatically. |
 | Match world does not open | Save and Quit your current world, reopen the lobby, select **Match**, then **Join Match World**. |
 | Loading or seed search takes a long time | Wait for the slowest client; loading has a five-minute timeout per attempt. Relax filters or leave them blank. Random filters try up to eight worlds. |
 | The HUD is missing or too large | Press **H**, check **Show HUD**, or reduce **HUD scale (%)**. |
-| Fullbright does nothing | Check both your local toggle (**G**) and the leader's **Allow fullbright** rule. |
+| Fullbright does nothing | Use **G** in a match world; check the fullbright key bind in Minecraft Controls. |
 | Recovery fails | Confirm the same synchronizer is online, the five-minute reservation has not expired, and you did not intentionally leave. |
 | Old saves are not being removed | Retention starts disabled. Check **Keep worlds**, favourites, world locks and recovery protection. Unmarked saves are intentionally excluded. |
-| Update installation fails | Read `config/rummage-update/install.log`, then install the verified jar manually with Minecraft closed. |
 
 ## Build and test
 
@@ -328,17 +294,17 @@ Requires **JDK 25**. The wrapper downloads Gradle **9.7.1** and dependencies on 
 
 | Output / command | Purpose |
 | --- | --- |
-| `build/libs/rummage-0.1.3.jar` | Installable client mod, standalone synchronizer and relay. |
-| `build/libs/rummage-0.1.3-sources.jar` | Source archive; do not install as the mod. |
+| `build/libs/rummage-0.1.6.jar` | Installable client mod, standalone synchronizer and relay. |
+| `build/libs/rummage-0.1.6-sources.jar` | Source archive; do not install as the mod. |
 | `./gradlew test` | Run the custom engine/integration suite through the standard test task. |
 | `powershell -ExecutionPolicy Bypass -File tools/test.ps1` | Run engine/network tests on Windows without downloading Minecraft or Gradle. |
 
-The custom `engineTest` runner currently passes **419 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **15 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-0.1.3.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
+The custom `engineTest` runner currently passes **423 assertions**, covering rounds, networking, recovery, TLS relays, update verification and protected-world cleanup. The standard Gradle `test` task runs that suite and allows the expected absence of JUnit tests. Separate descriptor checks cover **17 mixin targets and shadow fields**. An optional live Worker probe is available with `java -cp build/libs/rummage-0.1.6.jar tools/ProbeCloudRelay.java`; it creates and closes a temporary lobby. This environment blocked that outbound probe with `EACCES`; local WebSocket/UPnP fallback tests passed. Rendering, automatic world creation and multi-machine gameplay still need in-game smoke testing.
 
 <details>
 <summary><strong>Developer checks before publishing</strong></summary>
 
-Test two Minecraft clients through the automatic connection: inspect rules on both, try a failing random-seed filter, start with lookout, toggle the HUD/fullbright, check the race kit and complete a block. Let a deadline expire, vote a draw, and reach sudden death. Restart a non-host client and recover its world. Confirm ordinary worlds are unaffected by the lighting, loot and fair-play hooks. Exercise a signed update against a disposable mods directory.
+Test two Minecraft clients through the automatic connection: inspect rules on both, try a failing random-seed filter, start with lookout, toggle the HUD/fullbright, check the HUD size slider, confirm no starting supplies are given and complete a block. Let a deadline expire, vote a draw, and reach sudden death. Restart a non-host client and recover its world. Confirm ordinary worlds are unaffected by the lighting, loot and fair-play hooks.
 
 | Source folder | Responsibility |
 | --- | --- |

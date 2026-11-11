@@ -15,7 +15,7 @@ public class FogMixin {
         var mod=RummageClient.INSTANCE;
         var player=Minecraft.getInstance().player;
         if(player!=null&&(player.hasEffect(net.minecraft.world.effect.MobEffects.BLINDNESS)||player.hasEffect(net.minecraft.world.effect.MobEffects.DARKNESS)))return;
-        if(mod!=null&&mod.inMatchWorld()&&mod.connection.state.rules().race()&&level.dimension().equals(Level.NETHER)&&camera.getFluidInCamera()==FogType.NONE){
+        if(mod!=null&&mod.inMatchWorld()&&level.dimension().equals(Level.NETHER)&&camera.getFluidInCamera()==FogType.NONE){
             FogData fog=cir.getReturnValue();fog.environmentalStart=Math.max(fog.environmentalStart,distance*8);fog.environmentalEnd=Math.max(fog.environmentalEnd,distance*16);
         }
     }

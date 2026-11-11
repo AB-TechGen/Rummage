@@ -61,9 +61,15 @@ public final class EngineTest {
         }
     }
     static void features(){
-        MatchRules rules=new MatchRules(true,true,15,true,true,true,true,"plains","",400);
+        MatchRules rules=new MatchRules(true,15,"plains","",400);
         check(MatchRules.decode(rules.encode()).equals(rules),"Rules round trip");
-        rejected(()->MatchRules.decode("true"));rejected(()->new MatchRules(true,false,-1,true,false,true,true,"","",400));
+        check(MatchRules.decode("false,true,15,false,false,false,false,plains,,400").equals(rules),"Legacy preferences preserve match choices and discard retired flags");
+        check(MatchRules.decode("true,false,0,true,true,true,true,,,400").equals(MatchRules.DEFAULT),"Legacy race preference migrates without enabling starting supplies");
+        rejected(()->MatchRules.decode("maybe,0,,,400"));
+        Match biome= new Match();biome.join("biome test");biome.start(biome.leader,0);
+        biome.worldReport(biome.leader,biome.matchId,Set.of("minecraft:bamboo_block","minecraft:bedrock"),true,1);
+        check(biome.excluded.equals(Set.of("minecraft:bamboo_block")),"Biome target exclusions always apply and reject unrelated block IDs");
+        rejected(()->MatchRules.decode("true"));rejected(()->new MatchRules(false,-1,"","",400));
         Match sudden=running(2,1);sudden.rules=rules;
         for(var p:sudden.players.values())sudden.claim(p.id,sudden.matchId,1,sudden.target,5002);
         sudden.tick(5003);check(sudden.phase==Match.Phase.INTERMISSION,"Sudden death continues past cap");sudden.tick(sudden.deadline);
@@ -87,7 +93,7 @@ public final class EngineTest {
             try(LobbyConnection a=new LobbyConnection("RM-"+host.code,"Relay Alice",s->{},"",t->{},endpoint);LobbyConnection b=new LobbyConnection("RM-"+host.code,"Relay Bob",s->{},"",t->{},endpoint)){
                 await(()->a.state!=null&&b.state!=null&&a.state.players().size()==2);check(!a.id.equals(b.id),"Relay has independent client tunnels");
                 LobbyConnection leader=a.state.leader().equals(a.id)?a:b;
-                leader.send("RULES",new MatchRules(true,true,10,true,true,true,true,"","",400).encode(),"true");await(()->a.state.rules().suddenDeath()&&b.state.rules().race());
+                leader.send("RULES",new MatchRules(true,10,"","",400).encode(),"true");await(()->a.state.rules().suddenDeath()&&b.state.rules().lookoutSeconds()==10);
                 a.send("DIMENSION","minecraft:the_nether");await(()->b.state.player(a.id).dimension().equals("minecraft:the_nether"));
             }
             try(Socket socket=Relay.connect(endpoint)){socket.setSoTimeout(2000);Wire.write(new DataOutputStream(socket.getOutputStream()),"HOST",host.code,"wrong-secret","wrong-owner");try{Wire.read(new DataInputStream(socket.getInputStream()));throw new AssertionError("Relay owner takeover accepted");}catch(IOException expected){checks++;}}

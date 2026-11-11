@@ -19,7 +19,7 @@ public class LootRandomMixin {
     private void rummage$sequence(Optional<Identifier> sequence,CallbackInfoReturnable<LootContext> cir){
         RummageClient mod=RummageClient.INSTANCE;
         var state=mod==null?null:mod.activeState(params.getLevel().getServer());
-        if(state==null||!state.rules().standardDrops())return;
+        if(state==null)return;
         String key=sequence.map(Identifier::toString).orElse("");
         var block=params.contextMap().get(LootContextParams.BLOCK_STATE);
         if(block!=null)key="blocks/"+BuiltInRegistries.BLOCK.getKey(block.getBlock()).getPath().replace("deepslate_","");

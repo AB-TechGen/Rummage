@@ -5,7 +5,7 @@ import java.util.*;
 /** Single authoritative state machine, synchronized by its transport. Times are monotonic milliseconds. */
 public final class Match {
     public enum Phase { LOBBY, LOADING, COUNTDOWN, ROUND, INTERMISSION, FINISHED }
-    public static final String VERSION = "0.1.3";
+    public static final String VERSION = "0.1.6";
     public static final long RECONNECT_MS = 300_000;
     public static final class Player {
         public final String id, name;
@@ -41,7 +41,7 @@ public final class Match {
             else { phase=Phase.FINISHED; result="Seed filter not met. Change filters or seed and retry."; }
             return;
         }
-        if(rules.biomeTargets())for(String block:blocked)if(Set.of("minecraft:bamboo_block","minecraft:moss_block","minecraft:terracotta","minecraft:snow_block","minecraft:oak_planks","minecraft:dried_kelp_block").contains(block))excluded.add(block);
+        for(String block:blocked)if(Set.of("minecraft:bamboo_block","minecraft:moss_block","minecraft:terracotta","minecraft:snow_block","minecraft:oak_planks","minecraft:dried_kelp_block").contains(block))excluded.add(block);
         worldApproved=true;
     }
     public void voteDraw(String id, long now) {
